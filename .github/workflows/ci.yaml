@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone Creusot source
+        run: git clone https://github.com/creusot-rs/creusot
+
+      - name: Build
+        run: cargo build
+
+  creusot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.3.0
+          opam-pin: false
+
+      - name: Clone Creusot source
+        run: git clone https://github.com/creusot-rs/creusot
+
+      - name: Cache Creusot build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            creusot/target
+            ~/.local/share/creusot
+          key: ${{ runner.os }}
+
+      - name: Install Creusot
+        run: |
+          cd creusot
+          ./INSTALL
+
+      - name: Run Creusot
+        run: cargo creusot
