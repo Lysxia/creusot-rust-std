@@ -6,6 +6,8 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
+use creusot_contracts::{Clone, PartialEq, *};
+
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
@@ -13,7 +15,7 @@ use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, RangeInclusive};
 // use core::panic::const_panic;
 use core::simd::{self, Simd};
-use core::{fmt, ptr, hint, /* range, */};
+use core::{fmt, hint /* range, */, ptr};
 
 /*
 #[unstable(
@@ -50,7 +52,7 @@ pub use ascii::EscapeAscii;
 pub use ascii::is_ascii_simple;
 */
 //#[stable(feature = "slice_get_slice", since = "1.28.0")]
-use index::{range, SliceIndex};
+use index::{SliceIndex, range};
 
 use raw::{from_raw_parts, from_raw_parts_mut};
 
@@ -72,10 +74,7 @@ pub trait SliceExt<T> {
 
     unsafe fn split_at_unchecked(&self, mid: usize) -> (&[T], &[T]);
 
-    unsafe fn split_at_mut_unchecked(
-        &mut self,
-        mid: usize,
-    ) -> (&mut [T], &mut [T]);
+    unsafe fn split_at_mut_unchecked(&mut self, mid: usize) -> (&mut [T], &mut [T]);
 
     fn align_to_offsets<U>(&self) -> (usize, usize);
 
@@ -86,13 +85,9 @@ pub trait SliceExt<T> {
     fn first_chunk<const N: usize>(&self) -> Option<&[T; N]>;
     fn first_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]>;
     fn split_first_chunk<const N: usize>(&self) -> Option<(&[T; N], &[T])>;
-    fn split_first_chunk_mut<const N: usize>(
-        &mut self,
-    ) -> Option<(&mut [T; N], &mut [T])>;
+    fn split_first_chunk_mut<const N: usize>(&mut self) -> Option<(&mut [T; N], &mut [T])>;
     fn split_last_chunk<const N: usize>(&self) -> Option<(&[T], &[T; N])>;
-    fn split_last_chunk_mut<const N: usize>(
-        &mut self,
-    ) -> Option<(&mut [T], &mut [T; N])>;
+    fn split_last_chunk_mut<const N: usize>(&mut self) -> Option<(&mut [T], &mut [T; N])>;
     fn last_chunk<const N: usize>(&self) -> Option<&[T; N]>;
     fn last_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]>;
     fn reverse(&mut self);
@@ -150,6 +145,8 @@ impl<T> SliceExt<T> for [T] {
     //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
     //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
+    #[trusted]
+    #[requires(false)]
     unsafe fn get_unchecked<I>(&self, index: I) -> &I::Output
     where
         I: SliceIndex<Self>,
@@ -160,6 +157,8 @@ impl<T> SliceExt<T> for [T] {
         unsafe { &*index.get_unchecked(self) }
     }
 
+    #[trusted]
+    #[requires(false)]
     unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> &mut I::Output
     where
         I: SliceIndex<Self>,
@@ -189,6 +188,8 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     unsafe fn as_chunks_unchecked<const N: usize>(&self) -> &[[T; N]] {
         // assert_unsafe_precondition!(
@@ -203,6 +204,8 @@ impl<T> SliceExt<T> for [T] {
         unsafe { from_raw_parts(self.as_ptr().cast(), new_len) }
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     unsafe fn as_chunks_unchecked_mut<const N: usize>(&mut self) -> &mut [[T; N]] {
         // assert_unsafe_precondition!(
@@ -290,7 +293,8 @@ impl<T> SliceExt<T> for [T] {
 
         // Explicitly wrap the function call in a const block so it gets
         // constant-evaluated even in debug mode.
-        let gcd: usize = const { gcd(size_of::<T>(), size_of::<U>()) };
+        // let gcd: usize = const { gcd(size_of::<T>(), size_of::<U>()) };
+        let gcd: usize = gcd(size_of::<T>(), size_of::<U>());
         let ts: usize = size_of::<U>() / gcd;
         let us: usize = size_of::<T>() / gcd;
 
@@ -303,7 +307,8 @@ impl<T> SliceExt<T> for [T] {
 
     unsafe fn align_to<U>(&self) -> (&[T], &[U], &[T]) {
         // Note that most of this function will be constant-evaluated,
-        if U::IS_ZST || T::IS_ZST {
+        // if U::IS_ZST || T::IS_ZST {
+        if is_zst::<U>() || is_zst::<T>() {
             // handle ZSTs specially, which is – don't handle them at all.
             return (self, &[], &[]);
         }
@@ -338,7 +343,8 @@ impl<T> SliceExt<T> for [T] {
 
     unsafe fn align_to_mut<U>(&mut self) -> (&mut [T], &mut [U], &mut [T]) {
         // Note that most of this function will be constant-evaluated,
-        if U::IS_ZST || T::IS_ZST {
+        // if U::IS_ZST || T::IS_ZST {
+        if is_zst::<U>() || is_zst::<T>() {
             // handle ZSTs specially, which is – don't handle them at all.
             return (self, &mut [], &mut []);
         }
@@ -381,6 +387,8 @@ impl<T> SliceExt<T> for [T] {
 
     // Prove that the following safe abstractions (in library/core/src/slice/mod.rs) do not cause undefined behavior:
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn first_chunk<const N: usize>(&self) -> Option<&[T; N]> {
         if self.len() < N {
@@ -392,6 +400,8 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn first_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]> {
         if self.len() < N {
@@ -404,20 +414,26 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn split_first_chunk<const N: usize>(&self) -> Option<(&[T; N], &[T])> {
-        let Some((first, tail)) = self.split_at_checked(N) else { return None };
+        let Some((first, tail)) = self.split_at_checked(N) else {
+            return None;
+        };
 
         // SAFETY: We explicitly check for the correct number of elements,
         //   and do not let the references outlive the slice.
         Some((unsafe { &*(first.as_ptr().cast::<[T; N]>()) }, tail))
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
-    fn split_first_chunk_mut<const N: usize>(
-        &mut self,
-    ) -> Option<(&mut [T; N], &mut [T])> {
-        let Some((first, tail)) = self.split_at_mut_checked(N) else { return None };
+    fn split_first_chunk_mut<const N: usize>(&mut self) -> Option<(&mut [T; N], &mut [T])> {
+        let Some((first, tail)) = self.split_at_mut_checked(N) else {
+            return None;
+        };
 
         // SAFETY: We explicitly check for the correct number of elements,
         //   do not let the reference outlive the slice,
@@ -425,9 +441,13 @@ impl<T> SliceExt<T> for [T] {
         Some((unsafe { &mut *(first.as_mut_ptr().cast::<[T; N]>()) }, tail))
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn split_last_chunk<const N: usize>(&self) -> Option<(&[T], &[T; N])> {
-        let Some(index) = self.len().checked_sub(N) else { return None };
+        let Some(index) = self.len().checked_sub(N) else {
+            return None;
+        };
         let (init, last) = self.split_at(index);
 
         // SAFETY: We explicitly check for the correct number of elements,
@@ -435,11 +455,13 @@ impl<T> SliceExt<T> for [T] {
         Some((init, unsafe { &*(last.as_ptr().cast::<[T; N]>()) }))
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
-    fn split_last_chunk_mut<const N: usize>(
-        &mut self,
-    ) -> Option<(&mut [T], &mut [T; N])> {
-        let Some(index) = self.len().checked_sub(N) else { return None };
+    fn split_last_chunk_mut<const N: usize>(&mut self) -> Option<(&mut [T], &mut [T; N])> {
+        let Some(index) = self.len().checked_sub(N) else {
+            return None;
+        };
         let (init, last) = self.split_at_mut(index);
 
         // SAFETY: We explicitly check for the correct number of elements,
@@ -448,10 +470,14 @@ impl<T> SliceExt<T> for [T] {
         Some((init, unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) }))
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn last_chunk<const N: usize>(&self) -> Option<&[T; N]> {
         // FIXME(const-hack): Without const traits, we need this instead of `get`.
-        let Some(index) = self.len().checked_sub(N) else { return None };
+        let Some(index) = self.len().checked_sub(N) else {
+            return None;
+        };
         let (_, last) = self.split_at(index);
 
         // SAFETY: We explicitly check for the correct number of elements,
@@ -459,10 +485,14 @@ impl<T> SliceExt<T> for [T] {
         Some(unsafe { &*(last.as_ptr().cast::<[T; N]>()) })
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn last_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]> {
         // FIXME(const-hack): Without const traits, we need this instead of `get`.
-        let Some(index) = self.len().checked_sub(N) else { return None };
+        let Some(index) = self.len().checked_sub(N) else {
+            return None;
+        };
         let (_, last) = self.split_at_mut(index);
 
         // SAFETY: We explicitly check for the correct number of elements,
@@ -514,6 +544,8 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn as_chunks<const N: usize>(&self) -> (&[[T; N]], &[T]) {
         assert!(N != 0, "chunk size must be non-zero");
@@ -527,6 +559,8 @@ impl<T> SliceExt<T> for [T] {
         (array_slice, remainder)
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn as_rchunks<const N: usize>(&self) -> (&[T], &[[T; N]]) {
         assert!(N != 0, "chunk size must be non-zero");
@@ -538,6 +572,8 @@ impl<T> SliceExt<T> for [T] {
         (remainder, array_slice)
     }
 
+    #[trusted]
+    #[requires(false)]
     /* pub const */
     fn as_chunks_mut<const N: usize>(&mut self) -> (&mut [[T; N]], &mut [T]) {
         assert!(N != 0, "chunk size must be non-zero");
@@ -627,6 +663,8 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
+    #[requires(false)]
     fn partition_dedup_by<F>(&mut self, mut same_bucket: F) -> (&mut [T], &mut [T])
     where
         F: FnMut(&mut T, &mut T) -> bool,
@@ -787,11 +825,15 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     fn copy_within<R: RangeBounds<usize>>(&mut self, src: R, dest: usize)
     where
         T: Copy,
     {
-        let Range { start: src_start, end: src_end } = range(src, ..self.len());
+        let Range {
+            start: src_start,
+            end: src_end,
+        } = range(src, ..self.len());
         let count = src_end - src_start;
         assert!(dest <= self.len() - count, "dest is out of bounds");
         // SAFETY: the conditions for `ptr::copy` have all been checked above,
@@ -806,7 +848,10 @@ impl<T> SliceExt<T> for [T] {
     }
 
     fn swap_with_slice(&mut self, other: &mut [T]) {
-        assert!(self.len() == other.len(), "destination and source slices have different lengths");
+        assert!(
+            self.len() == other.len(),
+            "destination and source slices have different lengths"
+        );
         // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
         // checked to have the same length. The slices cannot overlap because
         // mutable references are exclusive.
@@ -860,6 +905,7 @@ impl<T> SliceExt<T> for [T] {
         unsafe { Ok(self.get_disjoint_unchecked_mut(indices)) }
     }
 
+    #[trusted]
     fn get_disjoint_unchecked_mut<I, const N: usize>(
         &mut self,
         indices: [I; N],
@@ -882,7 +928,7 @@ impl<T> SliceExt<T> for [T] {
                 let idx = indices.get_unchecked(i).clone();
                 arr_ptr.cast::<&mut I::Output>().add(i).write(
                     // &mut *slice.get_unchecked_mut(idx)
-                    &mut *idx.get_unchecked_mut(slice)
+                    &mut *idx.get_unchecked_mut(slice),
                 );
             }
             arr.assume_init()
@@ -896,8 +942,10 @@ trait ArraySliceExt<T, const N: usize> {
 }
 
 impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
+    #[trusted]
     fn as_flattened(&self) -> &[T] {
-        let len = if T::IS_ZST {
+        let len = // if T::IS_ZST {
+        if is_zst::<T>() {
             self.len().checked_mul(N).expect("slice len overflow")
         } else {
             // SAFETY: `self.len() * N` cannot overflow because `self` is
@@ -908,6 +956,7 @@ impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
         unsafe { from_raw_parts(self.as_ptr().cast(), len) }
     }
 
+    #[trusted]
     fn as_flattened_mut(&mut self) -> &mut [T] {
         let len = if T::IS_ZST {
             self.len().checked_mul(N).expect("slice len overflow")
@@ -926,7 +975,8 @@ fn select_unpredictable<T>(b: bool, true_val: T, false_val: T) -> T {
     if b { true_val } else { false_val }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(creusot), derive(Debug))]
+#[derive(DeepModel, Clone, PartialEq, Eq)]
 pub enum GetDisjointMutError {
     /// An index provided was out-of-bounds for the slice.
     IndexOutOfBounds,
@@ -948,7 +998,6 @@ pub unsafe trait GetDisjointMutIndex:
     // #[unstable(feature = "get_disjoint_mut_helpers", issue = "none")]
     fn is_overlapping(&self, other: &Self) -> bool;
 }
-
 
 mod private_get_disjoint_mut_index {
     use super::{Range, RangeInclusive, range};
@@ -990,6 +1039,13 @@ fn get_disjoint_check_valid<I: GetDisjointMutIndex, const N: usize>(
         }
     }
     Ok(())
+}
+
+// Placeholder for T::IS_ZST
+#[trusted]
+#[requires(false)]
+fn is_zst<T>() -> bool {
+    false
 }
 
 // The verification must be unbounded---it must hold for slices of arbitrary length.

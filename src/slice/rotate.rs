@@ -1,5 +1,7 @@
+use crate::slice::is_zst;
 use core::mem::{MaybeUninit, SizedTypeProperties};
 use core::{cmp, ptr};
+use creusot_contracts::*;
 
 type BufType = [usize; 32];
 
@@ -12,7 +14,8 @@ type BufType = [usize; 32];
 /// The specified range must be valid for reading and writing.
 #[inline]
 pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
-    if T::IS_ZST {
+    // if T::IS_ZST {
+    if is_zst::<T>() {
         return;
     }
     // abort early if the rotate is a no-op
@@ -45,6 +48,8 @@ pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
 ///
 /// The specified range must be valid for reading and writing.
 #[inline]
+#[trusted]
+#[requires(false)]
 unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
     // The `[T; 0]` here is to ensure this is appropriately aligned for T
     let mut rawarray = MaybeUninit::<(BufType, [T; 0])>::uninit();
