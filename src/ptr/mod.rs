@@ -3,12 +3,14 @@ use core::hint::assert_unchecked as assume;
 use creusot_contracts::*;
 
 #[requires(false)]
+#[allow(unused_variables)]
 pub const fn slice_from_raw_parts<T>(data: *const T, len: usize) -> *const [T] {
     // from_raw_parts(data, len)
     todo!()
 }
 
 #[requires(false)]
+#[allow(unused_variables)]
 pub const fn slice_from_raw_parts_mut<T>(data: *mut T, len: usize) -> *mut [T] {
     // from_raw_parts_mut(data, len)
     todo!()
@@ -96,9 +98,11 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
         ///
         /// Note, that this table does not contain values where inverse does not exist (i.e., for
         /// `0⁻¹ mod 16`, `2⁻¹ mod 16`, etc.)
+        #[allow(non_snake_case)]
         /* const */
         let INV_TABLE_MOD_16: [u8; 8] = [1, 11, 13, 7, 9, 3, 5, 15];
         /// Modulo for which the `INV_TABLE_MOD_16` is intended.
+        #[allow(non_snake_case)]
         /* const */
         let INV_TABLE_MOD: usize = 16;
 

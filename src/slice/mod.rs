@@ -11,11 +11,11 @@ use creusot_contracts::{Clone, PartialEq, *};
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
-use core::num::NonZero;
+// use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, RangeInclusive};
 // use core::panic::const_panic;
 use core::simd::{self, Simd};
-use core::{fmt, hint /* range, */, ptr};
+use core::{hint /* range, */, ptr};
 
 /*
 #[unstable(
@@ -131,7 +131,7 @@ pub trait SliceExt<T> {
     where
         I: GetDisjointMutIndex + SliceIndex<Self>;
 
-    fn get_disjoint_unchecked_mut<I, const N: usize>(
+    unsafe fn get_disjoint_unchecked_mut<I, const N: usize>(
         &mut self,
         indices: [I; N],
     ) -> [&mut I::Output; N]
@@ -800,9 +800,10 @@ impl<T> SliceExt<T> for [T] {
     {
         // The panic code path was put into a cold function to not bloat the
         // call site.
-        #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
-        #[cfg_attr(feature = "panic_immediate_abort", inline)]
+        // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+        // #[cfg_attr(feature = "panic_immediate_abort", inline)]
         #[track_caller]
+        #[allow(unused_variables)]
         const fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
             // const_panic!(
             //     "copy_from_slice: source slice length does not match destination slice length",
@@ -906,7 +907,7 @@ impl<T> SliceExt<T> for [T] {
     }
 
     #[trusted]
-    fn get_disjoint_unchecked_mut<I, const N: usize>(
+    unsafe fn get_disjoint_unchecked_mut<I, const N: usize>(
         &mut self,
         indices: [I; N],
     ) -> [&mut I::Output; N]
@@ -936,7 +937,7 @@ impl<T> SliceExt<T> for [T] {
     }
 }
 
-trait ArraySliceExt<T, const N: usize> {
+pub trait ArraySliceExt<T, const N: usize> {
     fn as_flattened(&self) -> &[T];
     fn as_flattened_mut(&mut self) -> &mut [T];
 }
@@ -1000,7 +1001,7 @@ pub unsafe trait GetDisjointMutIndex:
 }
 
 mod private_get_disjoint_mut_index {
-    use super::{Range, RangeInclusive, range};
+    use super::{Range, RangeInclusive, /* range */};
 
     // #[unstable(feature = "get_disjoint_mut_helpers", issue = "none")]
     pub trait Sealed {}

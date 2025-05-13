@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 pub const unsafe fn exact_div<T: Copy>(x: T, y: T) -> T {
     todo!("intrinsics")
 }
