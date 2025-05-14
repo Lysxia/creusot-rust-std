@@ -10,4 +10,4 @@ creusot-contracts = "0.6.0-dev"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(creusot)'] }
 
 [patch.crates-io]
-creusot-contracts = { path = "/home/sam/creusot/creusot-contracts" }
+creusot-contracts = { path = "creusot/creusot-contracts" }
