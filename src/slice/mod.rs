@@ -6,7 +6,8 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::{Clone, PartialEq, *};
+use creusot_contracts::ptr_own::{PtrOwn, RawPtr};
+use creusot_contracts::{Clone, PartialEq, std::ptr as cc_ptr, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
@@ -139,6 +140,19 @@ pub trait SliceExt<T> {
         I: GetDisjointMutIndex + SliceIndex<Self>;
 }
 
+#[pure]
+#[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
+#[ensures(result.0 == s[i])]
+#[ensures(result.1 == s[j])]
+#[ensures(forall<k: Int> k != i && k != j ==> match s.get(k) {
+    None => true,
+    Some(v) => resolve(&v),
+})]
+pub fn seq_get2_ghost<T>(s: Seq<T>, i: Int, j: Int) -> (T, T) {
+    let _ = (s, i, j);
+    todo!()
+}
+
 impl<T> SliceExt<T> for [T] {
     // For the following unsafe functions (in library/core/src/slice/mod.rs):
     //
@@ -169,6 +183,10 @@ impl<T> SliceExt<T> for [T] {
         unsafe { &mut *index.get_unchecked_mut(self) }
     }
 
+    // `s.exchange(t, i, j)` says precisely that `s: Seq<T>` is the result of exchanging
+    // elements at indices `i` and `j` in `t`.
+    #[requires(a@ < self@.len() && b@ < self@.len())]
+    #[ensures((^self)@.exchange(self@, a@, b@))]
     /* pub const */
     unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
         // assert_unsafe_precondition!(
@@ -181,10 +199,22 @@ impl<T> SliceExt<T> for [T] {
         //     ) => a < len && b < len,
         // );
 
-        let ptr = self.as_mut_ptr();
+        let (ptr, mut owns) = self.as_mut_ptr_own();
+        let own = ghost! {
+            if a == b {
+              let a_ = Int::new(a as i128).into_inner();
+              cc_ptr::DisjointOrEqual::Equal(owns.get_mut_ghost(a_).unwrap())
+            } else {
+              let a_ = Int::new(a as i128).into_inner();
+              let b_ = Int::new(b as i128).into_inner();
+              let (own_a, own_b) = seq_get2_ghost(owns.into_inner(), a_, b_);
+              cc_ptr::DisjointOrEqual::Disjoint(own_a, own_b)
+            }
+        };
+
         // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
         unsafe {
-            ptr::swap(ptr.add(a), ptr.add(b));
+            cc_ptr::swap_disjoint(ptr.add_own(a, ghost!(own.left_ghost())), ptr.add_own(b, ghost!(own.right_ghost())), own);
         }
     }
 
@@ -307,7 +337,7 @@ impl<T> SliceExt<T> for [T] {
 
     unsafe fn align_to<U>(&self) -> (&[T], &[U], &[T]) {
         // Note that most of this function will be constant-evaluated,
-        // if U::IS_ZST || T::IS_ZST {
+        // if U::IS_ZST || T::IS_ZST
         if is_zst::<U>() || is_zst::<T>() {
             // handle ZSTs specially, which is – don't handle them at all.
             return (self, &[], &[]);
@@ -343,7 +373,7 @@ impl<T> SliceExt<T> for [T] {
 
     unsafe fn align_to_mut<U>(&mut self) -> (&mut [T], &mut [U], &mut [T]) {
         // Note that most of this function will be constant-evaluated,
-        // if U::IS_ZST || T::IS_ZST {
+        // if U::IS_ZST || T::IS_ZST
         if is_zst::<U>() || is_zst::<T>() {
             // handle ZSTs specially, which is – don't handle them at all.
             return (self, &mut [], &mut []);
