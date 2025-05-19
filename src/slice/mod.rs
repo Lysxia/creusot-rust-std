@@ -17,6 +17,7 @@ use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, Ran
 // use core::panic::const_panic;
 use core::simd::{self, Simd};
 use core::{hint /* range, */, ptr};
+use crate::ptr as vptr;
 
 /*
 #[unstable(
@@ -203,18 +204,18 @@ impl<T> SliceExt<T> for [T] {
         let own = ghost! {
             if a == b {
               let a_ = Int::new(a as i128).into_inner();
-              cc_ptr::DisjointOrEqual::Equal(owns.get_mut_ghost(a_).unwrap())
+              vptr::DisjointOrEqual::Equal(owns.get_mut_ghost(a_).unwrap())
             } else {
               let a_ = Int::new(a as i128).into_inner();
               let b_ = Int::new(b as i128).into_inner();
               let (own_a, own_b) = seq_get2_ghost(owns.into_inner(), a_, b_);
-              cc_ptr::DisjointOrEqual::Disjoint(own_a, own_b)
+              vptr::DisjointOrEqual::Disjoint(own_a, own_b)
             }
         };
 
         // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
         unsafe {
-            cc_ptr::swap_disjoint(ptr.add_own(a, ghost!(own.left_ghost())), ptr.add_own(b, ghost!(own.right_ghost())), own);
+            vptr::swap_disjoint(ptr.add_own(a, ghost!(own.left_ghost())), ptr.add_own(b, ghost!(own.right_ghost())), own);
         }
     }
 
