@@ -215,7 +215,7 @@ impl<T> SliceExt<T> for [T] {
 
         // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
         unsafe {
-            vptr::swap_disjoint(ptr.add_own(a, ghost!(own.left_ghost())), ptr.add_own(b, ghost!(own.right_ghost())), own);
+            vptr::swap_disjoint(vptr::add_own(ptr, a, ghost!(own.left_ghost())), vptr::add_own(ptr, b, ghost!(own.right_ghost())), own);
         }
     }
 
