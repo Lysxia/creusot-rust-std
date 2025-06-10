@@ -3,20 +3,6 @@ use core::hint::assert_unchecked as assume;
 use creusot_contracts::*;
 use creusot_contracts::ptr_own::{PtrOwn, RawPtr};
 
-#[requires(false)]
-#[allow(unused_variables)]
-pub const fn slice_from_raw_parts<T>(data: *const T, len: usize) -> *const [T] {
-    // from_raw_parts(data, len)
-    todo!()
-}
-
-#[requires(false)]
-#[allow(unused_variables)]
-pub const fn slice_from_raw_parts_mut<T>(data: *mut T, len: usize) -> *mut [T] {
-    // from_raw_parts_mut(data, len)
-    todo!()
-}
-
 /// Align pointer `p`.
 ///
 /// Calculate offset (in terms of elements of `size_of::<T>()` stride) that has to be applied

@@ -6,7 +6,7 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::ptr_own::{PtrOwn, RawPtr};
+use creusot_contracts::ptr_own::{BlockOwn, PtrOwn, RawPtr};
 use creusot_contracts::{Clone, PartialEq, std::ptr as cc_ptr, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
@@ -142,6 +142,7 @@ pub trait SliceExt<T> {
 }
 
 #[pure]
+/*
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
 #[ensures(result.0 == s[i])]
 #[ensures(result.1 == s[j])]
@@ -149,7 +150,8 @@ pub trait SliceExt<T> {
     None => true,
     Some(v) => resolve(&v),
 })]
-pub fn seq_get2_ghost<T>(s: Seq<T>, i: Int, j: Int) -> (T, T) {
+ */
+pub fn block_get_2_ghost<T>(s: &mut BlockOwn<T>, i: Int, j: Int) -> (&mut PtrOwn<T>, &mut PtrOwn<T>) {
     let _ = (s, i, j);
     todo!()
 }
@@ -204,18 +206,18 @@ impl<T> SliceExt<T> for [T] {
         let own = ghost! {
             if a == b {
               let a_ = Int::new(a as i128).into_inner();
-              vptr::DisjointOrEqual::Equal(owns.get_mut_ghost(a_).unwrap())
+              vptr::DisjointOrEqual::Equal(owns.get_ptr_own_mut(a_))
             } else {
               let a_ = Int::new(a as i128).into_inner();
               let b_ = Int::new(b as i128).into_inner();
-              let (own_a, own_b) = seq_get2_ghost(owns.into_inner(), a_, b_);
+              let (own_a, own_b) = block_get_2_ghost(owns.into_inner(), a_, b_);
               vptr::DisjointOrEqual::Disjoint(own_a, own_b)
             }
         };
 
         // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
         unsafe {
-            vptr::swap_disjoint(vptr::add_own(ptr, a, ghost!(own.left_ghost())), vptr::add_own(ptr, b, ghost!(own.right_ghost())), own);
+            vptr::swap_disjoint(ptr.add_own(a, ghost!(*own.left_ghost().as_block_own_ref())), ptr.add_own(b, ghost!(*own.right_ghost().as_block_own_ref())), own);
         }
     }
 
