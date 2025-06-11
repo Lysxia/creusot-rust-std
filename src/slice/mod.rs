@@ -6,8 +6,8 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::ptr_own::{BlockOwn, PtrOwn, RawPtr};
-use creusot_contracts::{Clone, PartialEq, std::ptr as cc_ptr, *};
+use creusot_contracts::ptr_own::{BlockOwn, PtrOwn};
+use creusot_contracts::{Clone, PartialEq, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
@@ -141,19 +141,19 @@ pub trait SliceExt<T> {
         I: GetDisjointMutIndex + SliceIndex<Self>;
 }
 
+#[trusted]
 #[pure]
-/*
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
-#[ensures(result.0 == s[i])]
-#[ensures(result.1 == s[j])]
-#[ensures(forall<k: Int> k != i && k != j ==> match s.get(k) {
-    None => true,
-    Some(v) => resolve(&v),
-})]
- */
+#[ensures(result.0.ptr() == s.ptr().offset_logic(i))]
+#[ensures(result.1.ptr() == s.ptr().offset_logic(j))]
+#[ensures(*result.0.val() == s.contents()[i])]
+#[ensures(*result.1.val() == s.contents()[j])]
+#[ensures(*(^result.0).val() == (^s).contents()[i])]
+#[ensures(*(^result.1).val() == (^s).contents()[j])]
+#[ensures(forall<k: Int> (k != i && k != j ==> ((^s).contents().get(k) == s.contents().get(k))))]
 pub fn block_get_2_ghost<T>(s: &mut BlockOwn<T>, i: Int, j: Int) -> (&mut PtrOwn<T>, &mut PtrOwn<T>) {
-    let _ = (s, i, j);
-    todo!()
+    //let _ = (s, i, j);
+    panic!()
 }
 
 impl<T> SliceExt<T> for [T] {

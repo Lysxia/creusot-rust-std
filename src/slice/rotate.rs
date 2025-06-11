@@ -1,5 +1,5 @@
 use crate::slice::is_zst;
-use core::mem::{MaybeUninit, SizedTypeProperties};
+use core::mem::MaybeUninit;
 use core::{cmp, ptr};
 use creusot_contracts::*;
 

@@ -81,14 +81,14 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // #[safety::ensures(|result| wrapping_mul(*result, x) % m == 1)]
     #[inline]
     const unsafe fn mod_inv(x: usize, m: usize) -> usize {
-        /// Multiplicative modular inverse table modulo 2⁴ = 16.
-        ///
-        /// Note, that this table does not contain values where inverse does not exist (i.e., for
-        /// `0⁻¹ mod 16`, `2⁻¹ mod 16`, etc.)
+        // /// Multiplicative modular inverse table modulo 2⁴ = 16.
+        // ///
+        // /// Note, that this table does not contain values where inverse does not exist (i.e., for
+        // /// `0⁻¹ mod 16`, `2⁻¹ mod 16`, etc.)
         #[allow(non_snake_case)]
         /* const */
         let INV_TABLE_MOD_16: [u8; 8] = [1, 11, 13, 7, 9, 3, 5, 15];
-        /// Modulo for which the `INV_TABLE_MOD_16` is intended.
+        // /// Modulo for which the `INV_TABLE_MOD_16` is intended.
         #[allow(non_snake_case)]
         /* const */
         let INV_TABLE_MOD: usize = 16;
