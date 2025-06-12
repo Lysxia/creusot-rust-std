@@ -1,11 +1,11 @@
 use ::std::ptr;
-use creusot_contracts::{*, ptr_own::{BlockOwn, PtrOwn}};
+use creusot_contracts::{*, ptr_own::{SliceOwn, PtrOwn}};
 
 #[trusted]
 #[requires(own.ptr() == data.raw())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.contents())]
-pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a BlockOwn<T>>) -> &'a [T] {
+pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a SliceOwn<T>>) -> &'a [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
@@ -31,7 +31,7 @@ pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&
 #[ensures(result@ == own.contents())]
 #[ensures((^own.inner_logic()).ptr() == data.raw())]
 #[ensures((^result)@ == (^own.inner_logic()).contents())]
-pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost<&'a mut BlockOwn<T>>) -> &'a mut [T] {
+pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost<&'a mut SliceOwn<T>>) -> &'a mut [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
