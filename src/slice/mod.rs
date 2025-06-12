@@ -150,7 +150,9 @@ pub trait SliceExt<T> {
 #[ensures(*result.1.val() == s.contents()[j])]
 #[ensures(*(^result.0).val() == (^s).contents()[i])]
 #[ensures(*(^result.1).val() == (^s).contents()[j])]
-#[ensures(forall<k: Int> (k != i && k != j ==> ((^s).contents().get(k) == s.contents().get(k))))]
+#[ensures((^s).ptr() == s.ptr())]
+#[ensures((^s).len() == s.len())]
+#[ensures(forall<k: Int> k != i && k != j ==> (^s).contents().get(k) == s.contents().get(k))]
 pub fn block_get_2_ghost<T>(s: &mut BlockOwn<T>, i: Int, j: Int) -> (&mut PtrOwn<T>, &mut PtrOwn<T>) {
     //let _ = (s, i, j);
     panic!()
