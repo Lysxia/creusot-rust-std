@@ -141,21 +141,30 @@ pub trait SliceExt<T> {
         I: GetDisjointMutIndex + SliceIndex<Self>;
 }
 
-#[trusted]
 #[pure]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
 #[ensures(result.0.ptr() == s.ptr().offset_logic(i))]
 #[ensures(result.1.ptr() == s.ptr().offset_logic(j))]
 #[ensures(*result.0.val() == s.contents()[i])]
 #[ensures(*result.1.val() == s.contents()[j])]
-#[ensures(*(^result.0).val() == (^s).contents()[i])]
-#[ensures(*(^result.1).val() == (^s).contents()[j])]
-#[ensures((^s).ptr() == s.ptr())]
-#[ensures((^s).len() == s.len())]
-#[ensures(forall<k: Int> k != i && k != j ==> (^s).contents().get(k) == s.contents().get(k))]
-pub fn block_get_2_ghost<T>(s: &mut SliceOwn<T>, i: Int, j: Int) -> (&mut PtrOwn<T>, &mut PtrOwn<T>) {
-    //let _ = (s, i, j);
-    panic!()
+#[ensures(*(^result.inner_logic().0).val() == (^s.inner_logic()).contents()[i])]
+#[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).contents()[j])]
+#[ensures((^s.inner_logic()).ptr() == s.ptr())]
+#[ensures((^s.inner_logic()).len() == s.len())]
+#[ensures(forall<k: Int> k != i && k != j ==> (^s.inner_logic()).contents().get(k) == s.contents().get(k))]
+pub fn block_get_2_ghost<T>(s: Ghost<&mut SliceOwn<T>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
+    proof_assert!(forall<s: Seq<T>, i: Int, j: Int, k: Int> 0 <= i && i <= j && j <= s.len() && 0 <= k && k < j - i ==>
+      s.subsequence(i, j)[k] == s[i + k]);
+    ghost!{
+        let (s0, si) = s.into_inner().split_at_mut_ghost(i);
+        if i < j {
+            let (si, sj) = si.split_at_mut_ghost(j - i);
+            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+        } else {
+            let (_, sj) = s0.split_at_mut_ghost(j);
+            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+        }
+    }
 }
 
 impl<T> SliceExt<T> for [T] {
@@ -212,7 +221,7 @@ impl<T> SliceExt<T> for [T] {
             } else {
               let a_ = Int::new(a as i128).into_inner();
               let b_ = Int::new(b as i128).into_inner();
-              let (own_a, own_b) = block_get_2_ghost(owns.into_inner(), a_, b_);
+              let (own_a, own_b) = block_get_2_ghost(owns, a_, b_).into_inner();
               vptr::DisjointOrEqual::Disjoint(own_a, own_b)
             }
         };
