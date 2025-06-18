@@ -1,11 +1,11 @@
 use ::std::ptr;
-use creusot_contracts::{*, ptr_own::{SliceOwn, PtrOwn}};
+use creusot_contracts::{*, ptr_own::PtrOwn};
 
 #[trusted]
-#[requires(own.ptr() == data.raw())]
+#[requires(own.ptr().as_ptr_logic() == data.raw())]
 #[requires(len@ == own.len())]
-#[ensures(result@ == own.contents())]
-pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a SliceOwn<T>>) -> &'a [T] {
+#[ensures(result@ == own.val()@)]
+pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a PtrOwn<[T]>>) -> &'a [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
@@ -20,18 +20,17 @@ pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&
         //     ub_checks::maybe_is_aligned_and_not_null(data, align, false)
         //         && ub_checks::is_valid_allocation_size(size, len)
         // );
-        let (ptr, own) = std::slice::slice_from_raw_parts(data, len, own);
-        PtrOwn::as_ref(ptr, own)
+        PtrOwn::as_ref(std::ptr::slice_from_raw_parts(data, len), own)
     }
 }
 
 #[trusted]
-#[requires(own.ptr() == data.raw())]
+#[requires(own.ptr().as_ptr_logic() == data.raw())]
 #[requires(len@ == own.len())]
-#[ensures(result@ == own.contents())]
-#[ensures((^own.inner_logic()).ptr() == data.raw())]
-#[ensures((^result)@ == (^own.inner_logic()).contents())]
-pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost<&'a mut SliceOwn<T>>) -> &'a mut [T] {
+#[ensures(result@ == own.val()@)]
+#[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data.raw())]
+#[ensures((^result)@ == (^own.inner_logic()).val()@)]
+pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost<&'a mut PtrOwn<[T]>>) -> &'a mut [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
@@ -46,8 +45,7 @@ pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost
         //     ub_checks::maybe_is_aligned_and_not_null(data, align, false)
         //         && ub_checks::is_valid_allocation_size(size, len)
         // );
-        let (ptr, own) = std::slice::slice_from_raw_parts_mut(data, len, own);
-        PtrOwn::as_mut(ptr, own)
+        PtrOwn::as_mut(std::ptr::slice_from_raw_parts_mut(data, len), own)
     }
 }
 

@@ -6,7 +6,7 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::ptr_own::{SliceOwn, PtrOwn};
+use creusot_contracts::ptr_own::PtrOwn;
 use creusot_contracts::{Clone, PartialEq, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
@@ -143,16 +143,16 @@ pub trait SliceExt<T> {
 
 #[pure]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
-#[ensures(result.0.ptr() == s.ptr().offset_logic(i))]
-#[ensures(result.1.ptr() == s.ptr().offset_logic(j))]
-#[ensures(*result.0.val() == s.contents()[i])]
-#[ensures(*result.1.val() == s.contents()[j])]
-#[ensures(*(^result.inner_logic().0).val() == (^s.inner_logic()).contents()[i])]
-#[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).contents()[j])]
+#[ensures(result.0.ptr() == s.ptr().as_ptr_logic().offset_logic(i))]
+#[ensures(result.1.ptr() == s.ptr().as_ptr_logic().offset_logic(j))]
+#[ensures(*result.0.val() == s.val()@[i])]
+#[ensures(*result.1.val() == s.val()@[j])]
+#[ensures(*(^result.inner_logic().0).val() == (^s.inner_logic()).val()@[i])]
+#[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).val()@[j])]
 #[ensures((^s.inner_logic()).ptr() == s.ptr())]
 #[ensures((^s.inner_logic()).len() == s.len())]
-#[ensures(forall<k: Int> k != i && k != j ==> (^s.inner_logic()).contents().get(k) == s.contents().get(k))]
-pub fn block_get_2_ghost<T>(s: Ghost<&mut SliceOwn<T>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
+#[ensures(forall<k: Int> k != i && k != j ==> (^s.inner_logic()).val()@.get(k) == s.val()@.get(k))]
+pub fn block_get_2_ghost<T>(s: Ghost<&mut PtrOwn<[T]>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
     proof_assert!(forall<s: Seq<T>, i: Int, j: Int, k: Int> 0 <= i && i <= j && j <= s.len() && 0 <= k && k < j - i ==>
       s.subsequence(i, j)[k] == s[i + k]);
     ghost!{
