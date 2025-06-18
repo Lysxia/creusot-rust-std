@@ -153,16 +153,28 @@ pub trait SliceExt<T> {
 #[ensures((^s.inner_logic()).len() == s.len())]
 #[ensures(forall<k: Int> k != i && k != j ==> (^s.inner_logic()).val()@.get(k) == s.val()@.get(k))]
 pub fn block_get_2_ghost<T>(s: Ghost<&mut PtrOwn<[T]>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
-    proof_assert!(forall<s: Seq<T>, i: Int, j: Int, k: Int> 0 <= i && i <= j && j <= s.len() && 0 <= k && k < j - i ==>
-      s.subsequence(i, j)[k] == s[i + k]);
+    let s_ = snapshot!(s);
     ghost!{
-        let (s0, si) = s.into_inner().split_at_mut_ghost(i);
         if i < j {
-            let (si, sj) = si.split_at_mut_ghost(j - i);
-            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            let xi =  {
+                let (_, si) = s.into_inner().split_at_mut_ghost(i);
+                let (si, sj) = si.split_at_mut_ghost(j - i);
+                (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            };
+            proof_assert!(forall<k: Int> k < i ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            proof_assert!(forall<k: Int> i < k && k < j ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            proof_assert!(forall<k: Int> j < k ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            xi
         } else {
-            let (_, sj) = s0.split_at_mut_ghost(j);
-            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            let xi =  {
+                let (_, sj) = s.into_inner().split_at_mut_ghost(j);
+                let (sj, si) = sj.split_at_mut_ghost(i - j);
+                (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            };
+            proof_assert!(forall<k: Int> k < j ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            proof_assert!(forall<k: Int> j < k && k < i ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            proof_assert!(forall<k: Int> i < k ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
+            xi
         }
     }
 }
