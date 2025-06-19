@@ -1,8 +1,8 @@
 use ::std::ptr;
 use creusot_contracts::{*, ptr_own::{PtrOwn, RawPtr}};
 
-#[trusted]
 #[requires(own.ptr().as_ptr_logic() == data.raw())]
+#[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
 pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a PtrOwn<[T]>>) -> &'a [T] {
@@ -24,8 +24,8 @@ pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&
     }
 }
 
-#[trusted]
 #[requires(own.ptr().as_ptr_logic() == data.raw())]
+#[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
 #[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data.raw())]
