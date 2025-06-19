@@ -56,7 +56,7 @@ pub use ascii::is_ascii_simple;
 //#[stable(feature = "slice_get_slice", since = "1.28.0")]
 use index::{SliceIndex, range};
 
-use raw::{from_raw_parts, from_raw_parts_mut};
+use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_own, from_raw_parts_mut_own};
 
 // cannot define inherent `impl` for primitive types
 pub trait SliceExt<T> {
@@ -265,7 +265,7 @@ impl<T> SliceExt<T> for [T] {
 
     /* pub const */
     #[requires(mid@ <= self@.len())]
-    #[ensures(result.0@.len() == mid@)]
+    #[ensures(result.0@.len() == mid@ && result.1@.len() == self@.len() - mid@)]
     unsafe fn split_at_unchecked(&self, mid: usize) -> (&[T], &[T]) {
         // FIXME(const-hack): the const function `from_raw_parts` is used to make this
         // function const; previously the implementation used
@@ -290,9 +290,14 @@ impl<T> SliceExt<T> for [T] {
     }
 
     /* pub const */
+    #[requires(mid@ <= self@.len())]
+    #[ensures(result.0@.len() == mid@ && result.1@.len() == self@.len() - mid@)]
     unsafe fn split_at_mut_unchecked(&mut self, mid: usize) -> (&mut [T], &mut [T]) {
         let len = self.len();
-        let ptr = self.as_mut_ptr();
+        let (ptr, owns) = self.as_mut_ptr_own();
+        let (owns0, owns1) = ghost!{
+            owns.into_inner().split_at_mut_ghost(*Int::new(mid as i128))
+        }.split();
 
         // assert_unsafe_precondition!(
         //     check_library_ub,
@@ -306,8 +311,8 @@ impl<T> SliceExt<T> for [T] {
         // is fine.
         unsafe {
             (
-                from_raw_parts_mut(ptr, mid),
-                from_raw_parts_mut(ptr.add(mid), unchecked_sub(len, mid)),
+                from_raw_parts_mut_own(ptr as *mut T, mid, owns0),
+                from_raw_parts_mut_own(ptr.add_own(mid, ghost!(*owns1)) as *mut T, unchecked_sub(len, mid), owns1),
             )
         }
     }
