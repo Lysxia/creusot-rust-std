@@ -151,30 +151,17 @@ pub trait SliceExt<T> {
 #[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).val()@[j])]
 #[ensures((^s.inner_logic()).ptr() == s.ptr())]
 #[ensures((^s.inner_logic()).len() == s.len())]
-#[ensures(forall<k: Int> k != i && k != j ==> (^s.inner_logic()).val()@.get(k) == s.val()@.get(k))]
+#[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^s.inner_logic()).val()@[k] == s.val()@[k])]
 pub fn block_get_2_ghost<T>(s: Ghost<&mut PtrOwn<[T]>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
-    let s_ = snapshot!(s);
     ghost!{
         if i < j {
-            let xi =  {
-                let (_, si) = s.into_inner().split_at_mut_ghost(i);
-                let (si, sj) = si.split_at_mut_ghost(j - i);
-                (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
-            };
-            proof_assert!(forall<k: Int> k < i ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            proof_assert!(forall<k: Int> i < k && k < j ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            proof_assert!(forall<k: Int> j < k ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            xi
+            let (_, si) = s.into_inner().split_at_mut_ghost(i);
+            let (si, sj) = si.split_at_mut_ghost(j - i);
+            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
         } else {
-            let xi =  {
-                let (_, sj) = s.into_inner().split_at_mut_ghost(j);
-                let (sj, si) = sj.split_at_mut_ghost(i - j);
-                (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
-            };
-            proof_assert!(forall<k: Int> k < j ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            proof_assert!(forall<k: Int> j < k && k < i ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            proof_assert!(forall<k: Int> i < k ==> (^(*s_).inner_logic()).val()@.get(k) == (*s_).val()@.get(k));
-            xi
+            let (_, sj) = s.into_inner().split_at_mut_ghost(j);
+            let (sj, si) = sj.split_at_mut_ghost(i - j);
+            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
         }
     }
 }
@@ -277,6 +264,8 @@ impl<T> SliceExt<T> for [T] {
     }
 
     /* pub const */
+    #[requires(mid@ <= self@.len())]
+    #[ensures(result.0@.len() == mid@)]
     unsafe fn split_at_unchecked(&self, mid: usize) -> (&[T], &[T]) {
         // FIXME(const-hack): the const function `from_raw_parts` is used to make this
         // function const; previously the implementation used
