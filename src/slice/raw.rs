@@ -1,11 +1,18 @@
 use ::std::ptr;
-use creusot_contracts::{*, ptr_own::{PtrOwn, RawPtr}};
+use creusot_contracts::{
+    ptr_own::{PtrOwn, RawPtr},
+    *,
+};
 
 #[requires(own.ptr().as_ptr_logic() == data.raw())]
 #[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
-pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&'a PtrOwn<[T]>>) -> &'a [T] {
+pub unsafe fn from_raw_parts_own<'a, T>(
+    data: *const T,
+    len: usize,
+    own: Ghost<&'a PtrOwn<[T]>>,
+) -> &'a [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
@@ -30,7 +37,11 @@ pub unsafe fn from_raw_parts_own<'a, T>(data: *const T, len: usize, own: Ghost<&
 #[ensures(result@ == own.val()@)]
 #[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data.raw())]
 #[ensures((^result)@ == (^own.inner_logic()).val()@)]
-pub unsafe fn from_raw_parts_mut_own<'a, T>(data: *mut T, len: usize, own: Ghost<&'a mut PtrOwn<[T]>>) -> &'a mut [T] {
+pub unsafe fn from_raw_parts_mut_own<'a, T>(
+    data: *mut T,
+    len: usize,
+    own: Ghost<&'a mut PtrOwn<[T]>>,
+) -> &'a mut [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(

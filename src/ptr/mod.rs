@@ -1,7 +1,7 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
-use creusot_contracts::*;
 use creusot_contracts::ptr_own::{PtrOwn, RawPtr};
+use creusot_contracts::*;
 
 /// Align pointer `p`.
 ///

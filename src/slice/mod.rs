@@ -8,7 +8,7 @@
 
 use creusot_contracts::ptr_own::PtrOwn;
 #[cfg(creusot)]
-use creusot_contracts::util::{MakeSized as _};
+use creusot_contracts::util::MakeSized as _;
 use creusot_contracts::{Clone, PartialEq, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
@@ -17,9 +17,9 @@ use core::mem::{self, MaybeUninit, SizedTypeProperties};
 // use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, RangeInclusive};
 // use core::panic::const_panic;
+use crate::ptr as vptr;
 use core::simd::{self, Simd};
 use core::{hint /* range, */, ptr};
-use crate::ptr as vptr;
 
 /*
 #[unstable(
@@ -58,7 +58,7 @@ pub use ascii::is_ascii_simple;
 //#[stable(feature = "slice_get_slice", since = "1.28.0")]
 use index::{SliceIndex, range};
 
-use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_own, from_raw_parts_mut_own};
+use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_parts_own};
 
 // cannot define inherent `impl` for primitive types
 pub trait SliceExt<T>: View {
@@ -154,8 +154,12 @@ pub trait SliceExt<T>: View {
 #[ensures((^s.inner_logic()).ptr() == s.ptr())]
 #[ensures((^s.inner_logic()).len() == s.len())]
 #[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^s.inner_logic()).val()@[k] == s.val()@[k])]
-pub fn block_get_2_ghost<T>(s: Ghost<&mut PtrOwn<[T]>>, i: Int, j: Int) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
-    ghost!{
+pub fn block_get_2_ghost<T>(
+    s: Ghost<&mut PtrOwn<[T]>>,
+    i: Int,
+    j: Int,
+) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
+    ghost! {
         if i < j {
             let (_, si) = s.into_inner().split_at_mut_ghost(i);
             let (si, sj) = si.split_at_mut_ghost(j - i);
@@ -198,7 +202,7 @@ impl<T> SliceExt<T> for [T] {
     where
         I: SliceIndex<Self>,
     {
-        let (ptr, owns) =  PtrOwn::from_mut(self);
+        let (ptr, owns) = PtrOwn::from_mut(self);
         // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
         // the slice is dereferenceable because `self` is a safe reference.
         // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
@@ -239,7 +243,11 @@ impl<T> SliceExt<T> for [T] {
 
         // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
         unsafe {
-            vptr::swap_disjoint(ptr.add_own(a, ghost!(own.left_ghost().as_slice_own_ref_ghost())), ptr.add_own(b, ghost!(own.right_ghost().as_slice_own_ref_ghost())), own);
+            vptr::swap_disjoint(
+                ptr.add_own(a, ghost!(own.left_ghost().as_slice_own_ref_ghost())),
+                ptr.add_own(b, ghost!(own.right_ghost().as_slice_own_ref_ghost())),
+                own,
+            );
         }
     }
 
@@ -286,9 +294,8 @@ impl<T> SliceExt<T> for [T] {
 
         let len = self.len();
         let (ptr, owns) = self.as_ptr_own();
-        let (owns0, owns1) = ghost!{
-            owns.into_inner().split_at_ghost(*Int::new(mid as i128))
-        }.split();
+        let (owns0, owns1) =
+            ghost!(owns.into_inner().split_at_ghost(*Int::new(mid as i128))).split();
 
         // assert_unsafe_precondition!(
         //     check_library_ub,
@@ -314,9 +321,10 @@ impl<T> SliceExt<T> for [T] {
     unsafe fn split_at_mut_unchecked(&mut self, mid: usize) -> (&mut [T], &mut [T]) {
         let len = self.len();
         let (ptr, owns) = self.as_mut_ptr_own();
-        let (owns0, owns1) = ghost!{
+        let (owns0, owns1) = ghost! {
             owns.into_inner().split_at_mut_ghost(*Int::new(mid as i128))
-        }.split();
+        }
+        .split();
 
         // assert_unsafe_precondition!(
         //     check_library_ub,
@@ -331,7 +339,11 @@ impl<T> SliceExt<T> for [T] {
         unsafe {
             (
                 from_raw_parts_mut_own(ptr as *mut T, mid, owns0),
-                from_raw_parts_mut_own(ptr.add_own(mid, ghost!(*owns1)) as *mut T, len.unchecked_sub(mid), owns1),
+                from_raw_parts_mut_own(
+                    ptr.add_own(mid, ghost!(*owns1)) as *mut T,
+                    len.unchecked_sub(mid),
+                    owns1,
+                ),
             )
         }
     }
@@ -1070,7 +1082,7 @@ pub unsafe trait GetDisjointMutIndex:
 }
 
 mod private_get_disjoint_mut_index {
-    use super::{Range, RangeInclusive, /* range */};
+    use super::{Range, RangeInclusive /* range */};
 
     // #[unstable(feature = "get_disjoint_mut_helpers", issue = "none")]
     pub trait Sealed {}

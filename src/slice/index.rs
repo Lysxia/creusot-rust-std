@@ -5,9 +5,9 @@
 // use core::{ops, range};
 
 use crate::ops;
-use creusot_contracts::{ptr_own::*, *};
 #[cfg(creusot)]
-use creusot_contracts::{util::{SizedW, MakeSized as _}};
+use creusot_contracts::util::{MakeSized as _, SizedW};
+use creusot_contracts::{ptr_own::*, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -220,13 +220,17 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-     // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
-     // This does not type check here because we don't know that `T = [T0]` for some `T0`.
+    // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
+    // This does not type check here because we don't know that `T = [T0]` for some `T0`.
     #[requires(own.ptr() == slice.raw())]
     #[requires(self.in_bounds(own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
     #[ensures(self.slice_index(own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(self, slice: *const T, own: Ghost<&PtrOwn<T>>) -> (*const Self::Output, Ghost<&PtrOwn<Self::Output>>);
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const T,
+        own: Ghost<&PtrOwn<T>>,
+    ) -> (*const Self::Output, Ghost<&PtrOwn<Self::Output>>);
 
     /// Returns a mutable pointer to the output at this location, without
     /// performing any bounds checking.
@@ -242,7 +246,11 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     #[ensures(self.slice_index(own.val(), *result.1.val()))]
     #[ensures(self.slice_index((^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere(own.val(), (^own.inner_logic()).val()))]
-    unsafe fn get_unchecked_mut_own(self, slice: *mut T, own: Ghost<&mut PtrOwn<T>>) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut T,
+        own: Ghost<&mut PtrOwn<T>>,
+    ) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
 
     /// Use `get_unchecked_own` instead.
     #[requires(false)]
@@ -272,24 +280,28 @@ unsafe impl<T> SliceIndex<[T]> for usize {
 
     #[predicate]
     fn in_bounds(self, slice: SizedW<[T]>) -> bool {
-        pearlite!{ self@ < slice@.len() }
+        pearlite! { self@ < slice@.len() }
     }
 
     #[predicate]
     fn slice_index(self, slice: SizedW<[T]>, res: T) -> bool {
-        pearlite!{ res == slice@[self@] }
+        pearlite! { res == slice@[self@] }
     }
 
     #[predicate]
     fn resolve_elsewhere(self, old: SizedW<[T]>, fin: SizedW<[T]>) -> bool {
-        pearlite!{ forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
+        pearlite! { forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
     }
 
     #[trusted]
     #[inline]
     fn get(self, slice: &[T]) -> Option<&T> {
         // SAFETY: `self` is checked to be in bounds.
-        if self < slice.len() { unsafe { Some(todo!("&*get_noubcheck(slice, self)")) } } else { None }
+        if self < slice.len() {
+            unsafe { Some(todo!("&*get_noubcheck(slice, self)")) }
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -307,11 +319,18 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     #[requires(self.in_bounds((&*own.val()).make_sized()))]
     #[ensures(result.0.raw() == result.1.ptr())]
     #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
-    unsafe fn get_unchecked_own(self, slice: *const [T], own: Ghost<&PtrOwn<[T]>>) -> (*const T, Ghost<&PtrOwn<T>>) {
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const T, Ghost<&PtrOwn<T>>) {
         unsafe {
             ::std::hint::assert_unchecked(self < slice.len());
-            let own = ghost!{ own.split_at_ghost(*Int::new(self as i128)).1 };
-            (get_noubcheck(slice, self, own), ghost!(own.as_ptr_own_ref_ghost()))
+            let own = ghost! { own.split_at_ghost(*Int::new(self as i128)).1 };
+            (
+                get_noubcheck(slice, self, own),
+                ghost!(own.as_ptr_own_ref_ghost()),
+            )
         }
     }
 
@@ -322,11 +341,20 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
     #[ensures(self.slice_index((&*(^own.inner_logic()).val()).make_sized(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere((&*own.val()).make_sized(), (&*(^own.inner_logic()).val()).make_sized()))]
-    unsafe fn get_unchecked_mut_own(self, slice: *mut [T], own: Ghost<&mut PtrOwn<[T]>>) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
         unsafe {
             ::std::hint::assert_unchecked(self < slice.len());
-            let own = ghost!{ own.into_inner().split_at_mut_ghost(*Int::new(self as i128)) }.split().1;
-            (get_mut_noubcheck(slice, self, ghost!(&*own)), ghost!(own.into_inner().as_ptr_own_mut_ghost()))
+            let own = ghost! { own.into_inner().split_at_mut_ghost(*Int::new(self as i128)) }
+                .split()
+                .1;
+            (
+                get_mut_noubcheck(slice, self, ghost!(&*own)),
+                ghost!(own.into_inner().as_ptr_own_mut_ghost()),
+            )
         }
     }
 
