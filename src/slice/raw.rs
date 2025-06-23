@@ -1,6 +1,6 @@
 use ::std::ptr;
 use creusot_contracts::{
-    ptr_own::{PtrOwn, RawPtr},
+    ptr_own::PtrOwn,
     *,
 };
 
