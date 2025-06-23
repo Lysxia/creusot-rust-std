@@ -315,13 +315,3 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 }
-
-// TODO: Remove this (creusot is currently getting confused and uses the (currently too weak) general trait spec instead
-// of the impl for `*const`)
-// TODO: The offset in bytes, `count * size_of::<T>()`, must fit in an `isize`.
-#[trusted]
-#[requires(p.offset_logic(offset@) == own_offset.ptr())]
-#[ensures(p.offset_logic(offset@) == result)]
-pub unsafe fn add_own<T>(p: RawPtr<T>, offset: usize, own_offset: Ghost<&PtrOwn<T>>) -> RawPtr<T> {
-    unsafe { p.add(offset) }
-}
