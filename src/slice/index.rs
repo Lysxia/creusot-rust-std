@@ -304,6 +304,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
+    #[trusted]
     #[inline]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut T> {
         if self < slice.len() {
@@ -391,12 +392,14 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         unsafe { todo!("get_mut_noubcheck(slice, self)") }
     }
 
+    #[trusted]
     #[inline]
     fn index(self, slice: &[T]) -> &T {
         // N.B., use intrinsic indexing
         &(*slice)[self]
     }
 
+    #[trusted]
     #[inline]
     fn index_mut(self, slice: &mut [T]) -> &mut T {
         // N.B., use intrinsic indexing

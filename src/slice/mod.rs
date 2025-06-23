@@ -348,6 +348,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     /// Function to calculate lengths of the middle and trailing slice for `align_to{,_mut}`.
     fn align_to_offsets<U>(&self) -> (usize, usize) {
         // What we gonna do about `rest` is figure out what multiple of `U`s we can put in a
@@ -386,6 +387,7 @@ impl<T> SliceExt<T> for [T] {
         (us_len, ts_len)
     }
 
+    #[trusted]
     unsafe fn align_to<U>(&self) -> (&[T], &[U], &[T]) {
         // Note that most of this function will be constant-evaluated,
         // if U::IS_ZST || T::IS_ZST
@@ -422,6 +424,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     unsafe fn align_to_mut<U>(&mut self) -> (&mut [T], &mut [U], &mut [T]) {
         // Note that most of this function will be constant-evaluated,
         // if U::IS_ZST || T::IS_ZST
@@ -582,6 +585,7 @@ impl<T> SliceExt<T> for [T] {
         Some(unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) })
     }
 
+    #[trusted]
     /* pub const */
     fn reverse(&mut self) {
         let half_len = self.len() / 2;
@@ -690,6 +694,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     fn binary_search_by<'a, F>(&'a self, mut f: F) -> Result<usize, usize>
     where
         F: FnMut(&'a T) -> Ordering,
@@ -850,6 +855,7 @@ impl<T> SliceExt<T> for [T] {
         self.split_at_mut(next_write)
     }
 
+    #[trusted]
     fn rotate_left(&mut self, mid: usize) {
         assert!(mid <= self.len());
         let k = self.len() - mid;
@@ -862,6 +868,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     fn rotate_right(&mut self, k: usize) {
         assert!(k <= self.len());
         let mid = self.len() - k;
@@ -874,6 +881,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     /* pub const */
     fn copy_from_slice(&mut self, src: &[T])
     where
@@ -929,6 +937,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     fn swap_with_slice(&mut self, other: &mut [T]) {
         assert!(
             self.len() == other.len(),
@@ -942,6 +951,7 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
+    #[trusted]
     fn as_simd<const LANES: usize>(&self) -> (&[T], &[Simd<T, LANES>], &[T])
     where
         Simd<T, LANES>: AsRef<[T; LANES]>,
@@ -958,6 +968,7 @@ impl<T> SliceExt<T> for [T] {
         unsafe { self.align_to() }
     }
 
+    #[trusted]
     fn as_simd_mut<const LANES: usize>(&mut self) -> (&mut [T], &mut [Simd<T, LANES>], &mut [T])
     where
         Simd<T, LANES>: AsMut<[T; LANES]>,
@@ -974,6 +985,7 @@ impl<T> SliceExt<T> for [T] {
         unsafe { self.align_to_mut() }
     }
 
+    #[trusted]
     fn get_disjoint_mut<I, const N: usize>(
         &mut self,
         indices: [I; N],
@@ -1052,6 +1064,7 @@ impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
     }
 }
 
+#[trusted]
 // from std::hint since 1.89
 fn select_unpredictable<T>(b: bool, true_val: T, false_val: T) -> T {
     if b { true_val } else { false_val }
@@ -1099,6 +1112,7 @@ mod private_get_disjoint_mut_index {
     // impl Sealed for range::RangeInclusive<usize> {}
 }
 
+#[trusted]
 /// This checks every index against each other, and against `len`.
 ///
 /// This will do `binomial(N + 1, 2) = N * (N + 1) / 2 = 0, 1, 3, 6, 10, ..`

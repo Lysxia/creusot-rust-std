@@ -55,6 +55,7 @@ use creusot_contracts::*;
 //     let new_addr = usize::wrapping_add(product, p.addr());
 //     *result != usize::MAX && new_addr % a == 0
 // })]
+#[trusted]
 pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // FIXME(#75598): Direct use of these intrinsics improves codegen significantly at opt-level <=
     // 1, where the method versions of these operations are not inlined.
@@ -79,6 +80,7 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // ∀d, d > 0 ∧ x % d = 0 ∧ m % d = 0 → d = 1
     // With this precondition, we can then write this postcondition to check the correctness of the answer:
     // #[safety::ensures(|result| wrapping_mul(*result, x) % m == 1)]
+    #[trusted]
     #[inline]
     const unsafe fn mod_inv(x: usize, m: usize) -> usize {
         // /// Multiplicative modular inverse table modulo 2⁴ = 16.

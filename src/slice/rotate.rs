@@ -12,6 +12,7 @@ type BufType = [usize; 32];
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
+#[trusted]
 #[inline]
 pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
     // if T::IS_ZST {
@@ -121,6 +122,7 @@ unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
+#[trusted]
 #[inline]
 unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
     // Algorithm 2
@@ -226,6 +228,7 @@ unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
+#[trusted]
 #[inline]
 unsafe fn ptr_rotate_swap<T>(mut left: usize, mut mid: *mut T, mut right: usize) {
     loop {
