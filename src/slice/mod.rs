@@ -218,16 +218,6 @@ impl<T> SliceExt<T> for [T] {
     #[ensures((^self)@.exchange(self@, a@, b@))]
     /* pub const */
     unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
-        // assert_unsafe_precondition!(
-        //     check_library_ub,
-        //     "slice::swap_unchecked requires that the indices are within the slice",
-        //     (
-        //         len: usize = self.len(),
-        //         a: usize = a,
-        //         b: usize = b,
-        //     ) => a < len && b < len,
-        // );
-
         let (ptr, mut owns) = self.as_mut_ptr_own();
         let own = ghost! {
             if a == b {
@@ -288,22 +278,10 @@ impl<T> SliceExt<T> for [T] {
     #[ensures(self@.subsequence(0, mid@) == result.0@)]
     #[ensures(self@.subsequence(mid@, self@.len()) == result.1@)]
     unsafe fn split_at_unchecked(&self, mid: usize) -> (&[T], &[T]) {
-        // FIXME(const-hack): the const function `from_raw_parts` is used to make this
-        // function const; previously the implementation used
-        // `(self.get_unchecked(..mid), self.get_unchecked(mid..))`
-
         let len = self.len();
         let (ptr, owns) = self.as_ptr_own();
         let (owns0, owns1) =
             ghost!(owns.into_inner().split_at_ghost(*Int::new(mid as i128))).split();
-
-        // assert_unsafe_precondition!(
-        //     check_library_ub,
-        //     "slice::split_at_unchecked requires the index to be within the slice",
-        //     (mid: usize = mid, len: usize = len) => mid <= len,
-        // );
-
-        // SAFETY: Caller has to check that `0 <= mid <= self.len()`
         unsafe {
             (
                 from_raw_parts_own(ptr, mid, owns0),
@@ -325,17 +303,6 @@ impl<T> SliceExt<T> for [T] {
             owns.into_inner().split_at_mut_ghost(*Int::new(mid as i128))
         }
         .split();
-
-        // assert_unsafe_precondition!(
-        //     check_library_ub,
-        //     "slice::split_at_mut_unchecked requires the index to be within the slice",
-        //     (mid: usize = mid, len: usize = len) => mid <= len,
-        // );
-
-        // SAFETY: Caller has to check that `0 <= mid <= self.len()`.
-        //
-        // `[ptr; mid]` and `[mid; len]` are not overlapping, so returning a mutable reference
-        // is fine.
         unsafe {
             (
                 from_raw_parts_mut_own(ptr as *mut T, mid, owns0),
