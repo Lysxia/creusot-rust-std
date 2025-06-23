@@ -5,7 +5,7 @@
 // use core::{ops, range};
 
 use crate::ops;
-use creusot_contracts::{*, ptr_own::*};
+use creusot_contracts::{ptr_own::*, util::{SizedW, MakeSized as _}, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -178,17 +178,19 @@ mod private_slice_index {
 //     message = "the type `{T}` cannot be indexed by `{Self}`",
 //     label = "slice indices are of type `usize` or ranges of `usize`"
 // )]
-pub unsafe trait SliceIndex<T: ?Sized + View>: private_slice_index::Sealed {
+pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// The output type returned by methods.
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-    type Output: ?Sized + View;
+    type Output: ?Sized;
 
     #[predicate]
-    fn in_bounds(self, slice: T::ViewTy) -> bool;
+    fn in_bounds(self, slice: SizedW<T>) -> bool;
 
-    #[logic]
-    #[requires(self.in_bounds(slice))]
-    fn slice_index(self, slice: T::ViewTy) -> <Self::Output as View>::ViewTy;
+    #[predicate]
+    fn slice_index(self, slice: SizedW<T>, output: Self::Output) -> bool;
+
+    #[predicate]
+    fn resolve_elsewhere(self, old: SizedW<T>, fin: SizedW<T>) -> bool;
 
     /// Returns a shared reference to the output at this location, if in
     /// bounds.
@@ -209,9 +211,9 @@ pub unsafe trait SliceIndex<T: ?Sized + View>: private_slice_index::Sealed {
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds(own.val()@))]
+    #[requires(self.in_bounds(own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(result.1.val()@ == self.slice_index(own.val()@))]
+    #[ensures(self.slice_index(own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(self, slice: *const T, own: Ghost<&PtrOwn<T>>) -> (*const Self::Output, Ghost<&PtrOwn<Self::Output>>);
 
     /// Returns a mutable pointer to the output at this location, without
@@ -223,10 +225,11 @@ pub unsafe trait SliceIndex<T: ?Sized + View>: private_slice_index::Sealed {
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds(own.val()@))]
+    #[requires(self.in_bounds(own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(result.1.val()@ == self.slice_index(own.val()@))]
-    #[ensures((^result.1.inner_logic()).val()@ == self.slice_index((^own.inner_logic()).val()@))]
+    #[ensures(self.slice_index(own.val(), *result.1.val()))]
+    #[ensures(self.slice_index((^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
+    #[ensures(self.resolve_elsewhere(own.val(), (^own.inner_logic()).val()))]
     unsafe fn get_unchecked_mut_own(self, slice: *mut T, own: Ghost<&mut PtrOwn<T>>) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
 
     /// Use `get_unchecked_own` instead.
@@ -250,35 +253,72 @@ pub unsafe trait SliceIndex<T: ?Sized + View>: private_slice_index::Sealed {
     fn index_mut(self, slice: &mut T) -> &mut Self::Output;
 }
 
-/*
 /// The methods `index` and `index_mut` panic if the index is out of bounds.
 // #[stable(feature = "slice_get_slice_impls", since = "1.15.0")]
 unsafe impl<T> SliceIndex<[T]> for usize {
     type Output = T;
 
+    #[trusted]
+    #[predicate]
+    fn in_bounds(self, slice: SizedW<[T]>) -> bool {
+        pearlite!{ self@ < slice@.len() }
+    }
+
+    #[trusted]
+    #[predicate]
+    fn slice_index(self, slice: SizedW<[T]>, res: T) -> bool {
+        pearlite!{ res == slice@[self@] }
+    }
+
+    #[trusted]
+    #[predicate]
+    fn resolve_elsewhere(self, old: SizedW<[T]>, fin: SizedW<[T]>) -> bool {
+        pearlite!{ forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
+    }
+
+    #[trusted]
     #[inline]
     fn get(self, slice: &[T]) -> Option<&T> {
         // SAFETY: `self` is checked to be in bounds.
-        if self < slice.len() { unsafe { Some(&*get_noubcheck(slice, self)) } } else { None }
+        if self < slice.len() { unsafe { Some(todo!("&*get_noubcheck(slice, self)")) } } else { None }
     }
 
     #[inline]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut T> {
         if self < slice.len() {
             // SAFETY: `self` is checked to be in bounds.
-            unsafe { Some(&mut *get_mut_noubcheck(slice, self)) }
+            unsafe { todo!("Some(&mut *get_mut_noubcheck(slice, self))") }
         } else {
             None
         }
     }
 
+    #[requires(own.ptr() == slice.raw())]
+    #[requires(self.in_bounds((&*own.val()).make_sized()))]
+    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
+    unsafe fn get_unchecked_own(self, slice: *const [T], own: Ghost<&PtrOwn<[T]>>) -> (*const T, Ghost<&PtrOwn<T>>) {
+        todo!()
+    }
+
+    #[requires(own.ptr() == slice.raw())]
+    #[requires(self.in_bounds((&*own.val()).make_sized()))]
+    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
+    #[ensures(self.slice_index((&*(^own.inner_logic()).val()).make_sized(), *(^result.1.inner_logic()).val()))]
+    #[ensures(self.resolve_elsewhere((&*own.val()).make_sized(), (&*(^own.inner_logic()).val()).make_sized()))]
+    unsafe fn get_unchecked_mut_own(self, slice: *mut [T], own: Ghost<&mut PtrOwn<[T]>>) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
+        todo!()
+    }
+
+    #[trusted]
     #[inline]
     unsafe fn get_unchecked(self, slice: *const [T]) -> *const T {
-        assert_unsafe_precondition!(
-            check_language_ub,
-            "slice::get_unchecked requires that the index is within the slice",
-            (this: usize = self, len: usize = slice.len()) => this < len
-        );
+        // assert_unsafe_precondition!(
+        //     check_language_ub,
+        //     "slice::get_unchecked requires that the index is within the slice",
+        //     (this: usize = self, len: usize = slice.len()) => this < len
+        // );
         // SAFETY: the caller guarantees that `slice` is not dangling, so it
         // cannot be longer than `isize::MAX`. They also guarantee that
         // `self` is in bounds of `slice` so `self` cannot overflow an `isize`,
@@ -286,20 +326,22 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         unsafe {
             // Use intrinsics::assume instead of hint::assert_unchecked so that we don't check the
             // precondition of this function twice.
-            crate::intrinsics::assume(self < slice.len());
-            get_noubcheck(slice, self)
+            todo!()
+            // crate::intrinsics::assume(self < slice.len());
+            // get_noubcheck(slice, self)
         }
     }
 
+    #[trusted]
     #[inline]
     unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut T {
-        assert_unsafe_precondition!(
-            check_library_ub,
-            "slice::get_unchecked_mut requires that the index is within the slice",
-            (this: usize = self, len: usize = slice.len()) => this < len
-        );
+        // assert_unsafe_precondition!(
+        //     check_library_ub,
+        //     "slice::get_unchecked_mut requires that the index is within the slice",
+        //     (this: usize = self, len: usize = slice.len()) => this < len
+        // );
         // SAFETY: see comments for `get_unchecked` above.
-        unsafe { get_mut_noubcheck(slice, self) }
+        unsafe { todo!("get_mut_noubcheck(slice, self)") }
     }
 
     #[inline]
@@ -314,7 +356,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         &mut (*slice)[self]
     }
 }
- */
+
 /*
 /// Because `IndexRange` guarantees `start <= end`, fewer checks are needed here
 /// than there are for a general `Range<usize>` (which might be `100..3`).
