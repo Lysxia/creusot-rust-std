@@ -5,7 +5,9 @@
 // use core::{ops, range};
 
 use crate::ops;
-use creusot_contracts::{ptr_own::*, util::{SizedW, MakeSized as _}, *};
+use creusot_contracts::{ptr_own::*, *};
+#[cfg(creusot)]
+use creusot_contracts::{util::{SizedW, MakeSized as _}};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -87,26 +89,34 @@ const fn slice_end_index_overflow_fail() -> ! {
     panic!("attempted to index slice up to maximum usize");
 }
 
-/*
 // The UbChecks are great for catching bugs in the unsafe methods, but including
 // them in safe indexing is unnecessary and hurts inlining and debug runtime perf.
 // Both the safe and unsafe public methods share these helpers,
 // which use intrinsics directly to get *no* extra checks.
 
+#[trusted] // TODO cast *const [T] as *const T
+#[requires(ptr.raw().as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
+#[ensures(ptr.raw().as_ptr_logic().offset_logic(index@) == result.raw())]
 #[inline(always)]
-const unsafe fn get_noubcheck<T>(ptr: *const [T], index: usize) -> *const T {
+/* const */
+unsafe fn get_noubcheck<T>(ptr: *const [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *const T {
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
-    unsafe { crate::intrinsics::offset(ptr, index) }
+    unsafe { ptr.add_own(index, own) }
 }
 
+#[trusted] // TODO cast *mut [T] as *mut T
+#[requires(ptr.raw().as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
+#[ensures(ptr.raw().as_ptr_logic().offset_logic(index@) == result.raw())]
 #[inline(always)]
-const unsafe fn get_mut_noubcheck<T>(ptr: *mut [T], index: usize) -> *mut T {
+/* const */
+unsafe fn get_mut_noubcheck<T>(ptr: *mut [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
-    unsafe { crate::intrinsics::offset(ptr, index) }
+    unsafe { ptr.add_own(index, own) }
 }
 
+/*
 #[inline(always)]
 const unsafe fn get_offset_len_noubcheck<T>(
     ptr: *const [T],
@@ -210,6 +220,8 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
+     // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
+     // This does not type check here because we don't know that `T = [T0]` for some `T0`.
     #[requires(own.ptr() == slice.raw())]
     #[requires(self.in_bounds(own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
@@ -258,19 +270,16 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
 unsafe impl<T> SliceIndex<[T]> for usize {
     type Output = T;
 
-    #[trusted]
     #[predicate]
     fn in_bounds(self, slice: SizedW<[T]>) -> bool {
         pearlite!{ self@ < slice@.len() }
     }
 
-    #[trusted]
     #[predicate]
     fn slice_index(self, slice: SizedW<[T]>, res: T) -> bool {
         pearlite!{ res == slice@[self@] }
     }
 
-    #[trusted]
     #[predicate]
     fn resolve_elsewhere(self, old: SizedW<[T]>, fin: SizedW<[T]>) -> bool {
         pearlite!{ forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
@@ -293,14 +302,20 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
+    #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice.raw())]
     #[requires(self.in_bounds((&*own.val()).make_sized()))]
     #[ensures(result.0.raw() == result.1.ptr())]
     #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
     unsafe fn get_unchecked_own(self, slice: *const [T], own: Ghost<&PtrOwn<[T]>>) -> (*const T, Ghost<&PtrOwn<T>>) {
-        todo!()
+        unsafe {
+            ::std::hint::assert_unchecked(self < slice.len());
+            let own = ghost!{ own.split_at_ghost(*Int::new(self as i128)).1 };
+            (get_noubcheck(slice, self, own), ghost!(own.as_ptr_own_ref_ghost()))
+        }
     }
 
+    #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice.raw())]
     #[requires(self.in_bounds((&*own.val()).make_sized()))]
     #[ensures(result.0.raw() == result.1.ptr())]
@@ -308,7 +323,11 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     #[ensures(self.slice_index((&*(^own.inner_logic()).val()).make_sized(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere((&*own.val()).make_sized(), (&*(^own.inner_logic()).val()).make_sized()))]
     unsafe fn get_unchecked_mut_own(self, slice: *mut [T], own: Ghost<&mut PtrOwn<[T]>>) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
-        todo!()
+        unsafe {
+            ::std::hint::assert_unchecked(self < slice.len());
+            let own = ghost!{ own.into_inner().split_at_mut_ghost(*Int::new(self as i128)) }.split().1;
+            (get_mut_noubcheck(slice, self, ghost!(&*own)), ghost!(own.into_inner().as_ptr_own_mut_ghost()))
+        }
     }
 
     #[trusted]
@@ -327,7 +346,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             // Use intrinsics::assume instead of hint::assert_unchecked so that we don't check the
             // precondition of this function twice.
             todo!()
-            // crate::intrinsics::assume(self < slice.len());
+            // core::intrinsics::assume(self < slice.len());
             // get_noubcheck(slice, self)
         }
     }

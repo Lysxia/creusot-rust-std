@@ -7,6 +7,7 @@
 // #![stable(feature = "rust1", since = "1.0.0")]
 
 use creusot_contracts::ptr_own::PtrOwn;
+#[cfg(creusot)]
 use creusot_contracts::util::{MakeSized as _};
 use creusot_contracts::{Clone, PartialEq, *};
 
