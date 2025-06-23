@@ -59,7 +59,7 @@ use index::{SliceIndex, range};
 use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_own, from_raw_parts_mut_own};
 
 // cannot define inherent `impl` for primitive types
-pub trait SliceExt<T> {
+pub trait SliceExt<T>: View {
     unsafe fn get_unchecked<I>(&self, index: I) -> &I::Output
     where
         I: SliceIndex<Self>;
@@ -172,28 +172,37 @@ impl<T> SliceExt<T> for [T] {
     //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
     //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
-    #[trusted]
-    #[requires(false)]
+    #[requires(index.in_bounds(self@))]
+    #[ensures(result@ == index.slice_index(self@))]
     unsafe fn get_unchecked<I>(&self, index: I) -> &I::Output
     where
         I: SliceIndex<Self>,
     {
+        let (ptr, owns) = PtrOwn::from_ref(self);
         // SAFETY: the caller must uphold most of the safety requirements for `get_unchecked`;
         // the slice is dereferenceable because `self` is a safe reference.
         // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
-        unsafe { &*index.get_unchecked(self) }
+        unsafe {
+            let (ptr, own) = index.get_unchecked_own(ptr, owns);
+            PtrOwn::as_ref(ptr, own)
+        }
     }
 
-    #[trusted]
-    #[requires(false)]
+    #[requires(index.in_bounds(self@))]
+    #[ensures(result@ == index.slice_index(self@))]
+    #[ensures((^result)@ == index.slice_index((^self)@))]
     unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> &mut I::Output
     where
         I: SliceIndex<Self>,
     {
+        let (ptr, owns) =  PtrOwn::from_mut(self);
         // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
         // the slice is dereferenceable because `self` is a safe reference.
         // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
-        unsafe { &mut *index.get_unchecked_mut(self) }
+        unsafe {
+            let (ptr, own) = index.get_unchecked_mut_own(ptr as *mut [T], owns);
+            PtrOwn::as_mut(ptr, own)
+        }
     }
 
     // `s.exchange(t, i, j)` says precisely that `s: Seq<T>` is the result of exchanging

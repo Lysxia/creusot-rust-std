@@ -5,6 +5,7 @@
 // use core::{ops, range};
 
 use crate::ops;
+use creusot_contracts::{*, ptr_own::*};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -129,36 +130,34 @@ const unsafe fn get_offset_len_mut_noubcheck<T>(
 }
  */
 mod private_slice_index {
-    // use super::{ops, range};
+    use core::{ops, range};
 
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
     pub trait Sealed {}
 
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
     impl Sealed for usize {}
-    /*
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::Range<usize> {}
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::RangeTo<usize> {}
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::RangeFrom<usize> {}
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::RangeFull {}
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::RangeInclusive<usize> {}
-       // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-       impl Sealed for ops::RangeToInclusive<usize> {}
-       // #[stable(feature = "slice_index_with_ops_bound_pair", since = "1.53.0")]
-       impl Sealed for (ops::Bound<usize>, ops::Bound<usize>) {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::Range<usize> {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::RangeTo<usize> {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::RangeFrom<usize> {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::RangeFull {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::RangeInclusive<usize> {}
+    // #[stable(feature = "slice_get_slice", since = "1.28.0")]
+    impl Sealed for ops::RangeToInclusive<usize> {}
+    // #[stable(feature = "slice_index_with_ops_bound_pair", since = "1.53.0")]
+    impl Sealed for (ops::Bound<usize>, ops::Bound<usize>) {}
 
-       // #[unstable(feature = "new_range_api", issue = "125687")]
-       impl Sealed for range::Range<usize> {}
-       // #[unstable(feature = "new_range_api", issue = "125687")]
-       impl Sealed for range::RangeInclusive<usize> {}
-       // #[unstable(feature = "new_range_api", issue = "125687")]
-       impl Sealed for range::RangeFrom<usize> {}
-    */
+    // #[unstable(feature = "new_range_api", issue = "125687")]
+    impl Sealed for range::Range<usize> {}
+    // #[unstable(feature = "new_range_api", issue = "125687")]
+    impl Sealed for range::RangeInclusive<usize> {}
+    // #[unstable(feature = "new_range_api", issue = "125687")]
+    impl Sealed for range::RangeFrom<usize> {}
     // impl Sealed for ops::IndexRange {}
 }
 
@@ -179,10 +178,17 @@ mod private_slice_index {
 //     message = "the type `{T}` cannot be indexed by `{Self}`",
 //     label = "slice indices are of type `usize` or ranges of `usize`"
 // )]
-pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
+pub unsafe trait SliceIndex<T: ?Sized + View>: private_slice_index::Sealed {
     /// The output type returned by methods.
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
-    type Output: ?Sized;
+    type Output: ?Sized + View;
+
+    #[predicate]
+    fn in_bounds(self, slice: T::ViewTy) -> bool;
+
+    #[logic]
+    #[requires(self.in_bounds(slice))]
+    fn slice_index(self, slice: T::ViewTy) -> <Self::Output as View>::ViewTy;
 
     /// Returns a shared reference to the output at this location, if in
     /// bounds.
@@ -202,7 +208,11 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-    unsafe fn get_unchecked(self, slice: *const T) -> *const Self::Output;
+    #[requires(own.ptr() == slice.raw())]
+    #[requires(self.in_bounds(own.val()@))]
+    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.1.val()@ == self.slice_index(own.val()@))]
+    unsafe fn get_unchecked_own(self, slice: *const T, own: Ghost<&PtrOwn<T>>) -> (*const Self::Output, Ghost<&PtrOwn<Self::Output>>);
 
     /// Returns a mutable pointer to the output at this location, without
     /// performing any bounds checking.
@@ -212,6 +222,19 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
+    #[requires(own.ptr() == slice.raw())]
+    #[requires(self.in_bounds(own.val()@))]
+    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.1.val()@ == self.slice_index(own.val()@))]
+    #[ensures((^result.1.inner_logic()).val()@ == self.slice_index((^own.inner_logic()).val()@))]
+    unsafe fn get_unchecked_mut_own(self, slice: *mut T, own: Ghost<&mut PtrOwn<T>>) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
+
+    /// Use `get_unchecked_own` instead.
+    #[requires(false)]
+    unsafe fn get_unchecked(self, slice: *const T) -> *const Self::Output;
+
+    /// Use `get_unchecked_mut_own` instead.
+    #[requires(false)]
     unsafe fn get_unchecked_mut(self, slice: *mut T) -> *mut Self::Output;
 
     /// Returns a shared reference to the output at this location, panicking
