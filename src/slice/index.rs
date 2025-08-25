@@ -5,8 +5,6 @@
 // use core::{ops, range};
 
 use crate::ops;
-#[cfg(creusot)]
-use creusot_contracts::util::{MakeSized as _, SizedW};
 use creusot_contracts::{ptr_own::*, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
@@ -193,14 +191,14 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
     type Output: ?Sized;
 
-    #[predicate]
-    fn in_bounds(self, slice: SizedW<T>) -> bool;
+    #[logic]
+    fn in_bounds(self, slice: T) -> bool;
 
-    #[predicate]
-    fn slice_index(self, slice: SizedW<T>, output: Self::Output) -> bool;
+    #[logic]
+    fn slice_index(self, slice: T, output: Self::Output) -> bool;
 
-    #[predicate]
-    fn resolve_elsewhere(self, old: SizedW<T>, fin: SizedW<T>) -> bool;
+    #[logic]
+    fn resolve_elsewhere(self, old: T, fin: T) -> bool;
 
     /// Returns a shared reference to the output at this location, if in
     /// bounds.
@@ -223,9 +221,9 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
     // This does not type check here because we don't know that `T = [T0]` for some `T0`.
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds(own.val()))]
+    #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(self.slice_index(own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(
         self,
         slice: *const T,
@@ -241,11 +239,11 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds(own.val()))]
+    #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(self.slice_index(own.val(), *result.1.val()))]
-    #[ensures(self.slice_index((^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere(own.val(), (^own.inner_logic()).val()))]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut T,
@@ -278,18 +276,18 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
 unsafe impl<T> SliceIndex<[T]> for usize {
     type Output = T;
 
-    #[predicate]
-    fn in_bounds(self, slice: SizedW<[T]>) -> bool {
+    #[logic]
+    fn in_bounds(self, slice: [T]) -> bool {
         pearlite! { self@ < slice@.len() }
     }
 
-    #[predicate]
-    fn slice_index(self, slice: SizedW<[T]>, res: T) -> bool {
+    #[logic]
+    fn slice_index(self, slice: [T], res: T) -> bool {
         pearlite! { res == slice@[self@] }
     }
 
-    #[predicate]
-    fn resolve_elsewhere(self, old: SizedW<[T]>, fin: SizedW<[T]>) -> bool {
+    #[logic]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
         pearlite! { forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
     }
 
@@ -317,9 +315,9 @@ unsafe impl<T> SliceIndex<[T]> for usize {
 
     #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds((&*own.val()).make_sized()))]
+    #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(
         self,
         slice: *const [T],
@@ -337,11 +335,11 @@ unsafe impl<T> SliceIndex<[T]> for usize {
 
     #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice.raw())]
-    #[requires(self.in_bounds((&*own.val()).make_sized()))]
+    #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0.raw() == result.1.ptr())]
-    #[ensures(self.slice_index((&*own.val()).make_sized(), *result.1.val()))]
-    #[ensures(self.slice_index((&*(^own.inner_logic()).val()).make_sized(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere((&*own.val()).make_sized(), (&*(^own.inner_logic()).val()).make_sized()))]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut [T],

@@ -279,7 +279,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 
-    #[pure]
+    #[check(ghost)]
     #[ensures(result == self.left())]
     pub fn left_ghost(&self) -> &PtrOwn<T> {
         match self {
@@ -288,7 +288,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 
-    #[pure]
+    #[check(ghost)]
     #[ensures(result == self.right())]
     pub fn right_ghost(&self) -> &PtrOwn<T> {
         match self {
@@ -297,7 +297,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 
-    #[pure]
+    #[check(ghost)]
     #[ensures(*result == *self.left())]
     #[ensures(^result == *(^self).left())]
     pub fn left_mut_ghost(&mut self) -> &mut PtrOwn<T> {
@@ -307,7 +307,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 
-    #[pure]
+    #[check(ghost)]
     #[ensures(*result == *self.right())]
     #[ensures(^result == *(^self).right())]
     pub fn right_mut_ghost(&mut self) -> &mut PtrOwn<T> {

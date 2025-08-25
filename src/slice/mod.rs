@@ -7,8 +7,6 @@
 // #![stable(feature = "rust1", since = "1.0.0")]
 
 use creusot_contracts::ptr_own::PtrOwn;
-#[cfg(creusot)]
-use creusot_contracts::util::MakeSized as _;
 use creusot_contracts::{Clone, PartialEq, *};
 
 use crate::intrinsics::{exact_div, unchecked_sub};
@@ -143,7 +141,7 @@ pub trait SliceExt<T>: View {
         I: GetDisjointMutIndex + SliceIndex<Self>;
 }
 
-#[pure]
+#[check(ghost)]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
 #[ensures(result.0.ptr() == s.ptr().as_ptr_logic().offset_logic(i))]
 #[ensures(result.1.ptr() == s.ptr().as_ptr_logic().offset_logic(j))]
@@ -178,8 +176,8 @@ impl<T> SliceExt<T> for [T] {
     //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
     //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
-    #[requires(index.in_bounds((&*self).make_sized()))]
-    #[ensures(index.slice_index((&*self).make_sized(), *result))]
+    #[requires(index.in_bounds(*self))]
+    #[ensures(index.slice_index(*self, *result))]
     unsafe fn get_unchecked<I>(&self, index: I) -> &I::Output
     where
         I: SliceIndex<Self>,
@@ -194,10 +192,10 @@ impl<T> SliceExt<T> for [T] {
         }
     }
 
-    #[requires(index.in_bounds((&*self).make_sized()))]
-    #[ensures(index.slice_index((&*self).make_sized(), *result))]
-    #[ensures(index.slice_index((&^self).make_sized(), ^result))]
-    #[ensures(index.resolve_elsewhere((&*self).make_sized(), (&^self).make_sized()))]
+    #[requires(index.in_bounds(*self))]
+    #[ensures(index.slice_index(*self, *result))]
+    #[ensures(index.slice_index(^self, ^result))]
+    #[ensures(index.resolve_elsewhere(*self, ^self))]
     unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> &mut I::Output
     where
         I: SliceIndex<Self>,
