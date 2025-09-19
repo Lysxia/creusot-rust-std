@@ -5,7 +5,7 @@
 // use core::{ops, range};
 
 use crate::ops;
-use creusot_contracts::{ptr_own::*, *};
+use creusot_contracts::{ghost::PtrOwn, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -92,9 +92,8 @@ const fn slice_end_index_overflow_fail() -> ! {
 // Both the safe and unsafe public methods share these helpers,
 // which use intrinsics directly to get *no* extra checks.
 
-#[trusted] // TODO cast *const [T] as *const T
-#[requires(ptr.raw().as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
-#[ensures(ptr.raw().as_ptr_logic().offset_logic(index@) == result.raw())]
+#[requires(ptr.as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
+#[ensures(ptr.as_ptr_logic().offset_logic(index@) == result)]
 #[inline(always)]
 /* const */
 unsafe fn get_noubcheck<T>(ptr: *const [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *const T {
@@ -103,9 +102,8 @@ unsafe fn get_noubcheck<T>(ptr: *const [T], index: usize, own: Ghost<&PtrOwn<[T]
     unsafe { ptr.add_own(index, own) }
 }
 
-#[trusted] // TODO cast *mut [T] as *mut T
-#[requires(ptr.raw().as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
-#[ensures(ptr.raw().as_ptr_logic().offset_logic(index@) == result.raw())]
+#[requires((ptr as *const [T]).as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
+#[ensures((ptr as *const [T]).as_ptr_logic().offset_logic(index@) == result as *const T)]
 #[inline(always)]
 /* const */
 unsafe fn get_mut_noubcheck<T>(ptr: *mut [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
@@ -220,9 +218,9 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
     // This does not type check here because we don't know that `T = [T0]` for some `T0`.
-    #[requires(own.ptr() == slice.raw())]
+    #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.0 == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(
         self,
@@ -238,9 +236,9 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-    #[requires(own.ptr() == slice.raw())]
+    #[requires(own.ptr() == slice as *const T)]
     #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
@@ -314,9 +312,9 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
-    #[requires(own.ptr() == slice.raw())]
+    #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.0 == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(
         self,
@@ -334,9 +332,9 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
-    #[requires(own.ptr() == slice.raw())]
+    #[requires(own.ptr() == slice as *const [T])]
     #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0.raw() == result.1.ptr())]
+    #[ensures(result.0 as *const T == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]

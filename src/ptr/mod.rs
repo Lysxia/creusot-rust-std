@@ -1,6 +1,6 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
-use creusot_contracts::ptr_own::{PtrOwn, RawPtr};
+use creusot_contracts::ghost::PtrOwn;
 use creusot_contracts::*;
 
 /// Align pointer `p`.
@@ -250,7 +250,7 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 #[requires(a == own.left().ptr() && b == own.right().ptr())]
 #[ensures((^own.left()).ptr() == own.left().ptr() && (^own.left()).val() == own.right().val())]
 #[ensures((^own.right()).ptr() == own.right().ptr() && (^own.right()).val() == own.left().val())]
-pub unsafe fn swap_disjoint<T>(a: RawPtr<T>, b: RawPtr<T>, own: Ghost<DisjointOrEqual<T>>) {
+pub unsafe fn swap_disjoint<T>(a: *const T, b: *const T, own: Ghost<DisjointOrEqual<T>>) {
     // SAFETY: `a` and `b` are disjoint pointers, so this is safe.
     unsafe { ::std::ptr::swap(a.cast_mut(), b.cast_mut()) }
 }

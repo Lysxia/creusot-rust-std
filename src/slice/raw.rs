@@ -1,10 +1,10 @@
 use ::std::ptr;
 use creusot_contracts::{
-    ptr_own::PtrOwn,
+    ghost::PtrOwn,
     *,
 };
 
-#[requires(own.ptr().as_ptr_logic() == data.raw())]
+#[requires(own.ptr().as_ptr_logic() == data)]
 #[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
@@ -31,11 +31,11 @@ pub unsafe fn from_raw_parts_own<'a, T>(
     }
 }
 
-#[requires(own.ptr().as_ptr_logic() == data.raw())]
+#[requires(own.ptr().as_ptr_logic() == data as *const T)]
 #[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
-#[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data.raw())]
+#[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data as *const T)]
 #[ensures((^result)@ == (^own.inner_logic()).val()@)]
 pub unsafe fn from_raw_parts_mut_own<'a, T>(
     data: *mut T,

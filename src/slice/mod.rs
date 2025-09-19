@@ -6,9 +6,8 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::ptr_own::PtrOwn;
+use creusot_contracts::ghost::PtrOwn;
 use creusot_contracts::{Clone, PartialEq, *};
-
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
@@ -54,7 +53,7 @@ pub use ascii::EscapeAscii;
 pub use ascii::is_ascii_simple;
 */
 //#[stable(feature = "slice_get_slice", since = "1.28.0")]
-use index::{SliceIndex, range};
+use crate::slice::index::{SliceIndex, range};
 
 use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_parts_own};
 
