@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![feature(new_range_api)]
 #![feature(sized_type_properties)]
 #![feature(portable_simd)]

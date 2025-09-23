@@ -248,14 +248,6 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
         own: Ghost<&mut PtrOwn<T>>,
     ) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
 
-    /// Use `get_unchecked_own` instead.
-    #[requires(false)]
-    unsafe fn get_unchecked(self, slice: *const T) -> *const Self::Output;
-
-    /// Use `get_unchecked_mut_own` instead.
-    #[requires(false)]
-    unsafe fn get_unchecked_mut(self, slice: *mut T) -> *mut Self::Output;
-
     /// Returns a shared reference to the output at this location, panicking
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
@@ -311,7 +303,6 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
-    #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 == result.1.ptr())]
@@ -331,7 +322,6 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
-    #[requires(own.len() == own.ptr().len_logic())] // TODO invariant
     #[requires(own.ptr() == slice as *const [T])]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const T == result.1.ptr())]
@@ -353,39 +343,6 @@ unsafe impl<T> SliceIndex<[T]> for usize {
                 ghost!(own.into_inner().as_ptr_own_mut_ghost()),
             )
         }
-    }
-
-    #[trusted]
-    #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const T {
-        // assert_unsafe_precondition!(
-        //     check_language_ub,
-        //     "slice::get_unchecked requires that the index is within the slice",
-        //     (this: usize = self, len: usize = slice.len()) => this < len
-        // );
-        // SAFETY: the caller guarantees that `slice` is not dangling, so it
-        // cannot be longer than `isize::MAX`. They also guarantee that
-        // `self` is in bounds of `slice` so `self` cannot overflow an `isize`,
-        // so the call to `add` is safe.
-        unsafe {
-            // Use intrinsics::assume instead of hint::assert_unchecked so that we don't check the
-            // precondition of this function twice.
-            todo!()
-            // core::intrinsics::assume(self < slice.len());
-            // get_noubcheck(slice, self)
-        }
-    }
-
-    #[trusted]
-    #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut T {
-        // assert_unsafe_precondition!(
-        //     check_library_ub,
-        //     "slice::get_unchecked_mut requires that the index is within the slice",
-        //     (this: usize = self, len: usize = slice.len()) => this < len
-        // );
-        // SAFETY: see comments for `get_unchecked` above.
-        unsafe { todo!("get_mut_noubcheck(slice, self)") }
     }
 
     #[trusted]
