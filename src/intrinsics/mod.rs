@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+use creusot_contracts::*;
 
 pub const unsafe fn exact_div<T: Copy>(x: T, y: T) -> T {
     panic!("intrinsics")
@@ -38,4 +39,10 @@ pub const fn wrapping_mul<T: Copy>(a: T, b: T) -> T {
 
 pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
     panic!("intrinsics")
+}
+
+#[trusted]
+#[erasure("core::ub_checks::check_language_ub")]
+pub(crate) fn check_language_ub() -> bool {
+    false
 }
