@@ -8,6 +8,7 @@ use creusot_contracts::{
 #[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
+#[erasure(::std::slice::from_raw_parts)]
 pub unsafe fn from_raw_parts_own<'a, T>(
     data: *const T,
     len: usize,
@@ -37,6 +38,7 @@ pub unsafe fn from_raw_parts_own<'a, T>(
 #[ensures(result@ == own.val()@)]
 #[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data as *const T)]
 #[ensures((^result)@ == (^own.inner_logic()).val()@)]
+#[erasure(::std::slice::from_raw_parts_mut)]
 pub unsafe fn from_raw_parts_mut_own<'a, T>(
     data: *mut T,
     len: usize,
