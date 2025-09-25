@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+pub use ::core::intrinsics::const_eval_select;
 use creusot_contracts::*;
 
 pub const unsafe fn exact_div<T: Copy>(x: T, y: T) -> T {
@@ -41,8 +42,67 @@ pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
     panic!("intrinsics")
 }
 
-#[trusted]
-#[erasure("core::ub_checks::check_language_ub")]
-pub(crate) fn check_language_ub() -> bool {
-    false
+pub(crate) macro const_eval_select {
+    (
+        @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
+        if const
+            $(#[$compiletime_attr:meta])* $compiletime:block
+        else
+            $(#[$runtime_attr:meta])* $runtime:block
+    ) => {
+        // Use the `noinline` arm, after adding explicit `inline` attributes
+        $crate::intrinsics::const_eval_select!(
+            @capture$([$($binders)*])? { $($arg : $ty = $val),* } $(-> $ret)? :
+            #[noinline]
+            if const
+                #[inline] // prevent codegen on this function
+                $(#[$compiletime_attr])*
+                $compiletime
+            else
+                #[inline] // avoid the overhead of an extra fn call
+                $(#[$runtime_attr])*
+                $runtime
+        )
+    },
+    // With a leading #[noinline], we don't add inline attributes
+    (
+        @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
+        #[noinline]
+        if const
+            $(#[$compiletime_attr:meta])* $compiletime:block
+        else
+            $(#[$runtime_attr:meta])* $runtime:block
+    ) => {{
+        $(#[$runtime_attr])*
+        fn runtime$(<$($binders)*>)?($($arg: $ty),*) $( -> $ret )? {
+            $runtime
+        }
+
+        $(#[$compiletime_attr])*
+        const fn compiletime$(<$($binders)*>)?($($arg: $ty),*) $( -> $ret )? {
+            // Don't warn if one of the arguments is unused.
+            $(let _ = $arg;)*
+
+            $compiletime
+        }
+
+        const_eval_select(($($val,)*), compiletime, runtime)
+    }},
+    // We support leaving away the `val` expressions for *all* arguments
+    // (but not for *some* arguments, that's too tricky).
+    (
+        @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty),* $(,)? } $( -> $ret:ty )? :
+        if const
+            $(#[$compiletime_attr:meta])* $compiletime:block
+        else
+            $(#[$runtime_attr:meta])* $runtime:block
+    ) => {
+        $crate::intrinsics::const_eval_select!(
+            @capture$([$($binders)*])? { $($arg : $ty = $arg),* } $(-> $ret)? :
+            if const
+                $(#[$compiletime_attr])* $compiletime
+            else
+                $(#[$runtime_attr])* $runtime
+        )
+    },
 }

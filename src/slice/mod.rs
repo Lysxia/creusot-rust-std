@@ -6,11 +6,11 @@
 
 // #![stable(feature = "rust1", since = "1.0.0")]
 
-use creusot_contracts::ghost::PtrOwn;
-use creusot_contracts::{Clone, PartialEq, *};
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
+use creusot_contracts::ghost::PtrOwn;
+use creusot_contracts::{Clone, PartialEq, *};
 // use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, RangeInclusive};
 // use core::panic::const_panic;
@@ -203,8 +203,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 
     let len = self_.len();
     let (ptr, owns) = self_.as_ptr_own();
-    let (owns0, owns1) =
-        ghost!(owns.into_inner().split_at_ghost(*Int::new(mid as i128))).split();
+    let (owns0, owns1) = ghost!(owns.into_inner().split_at_ghost(*Int::new(mid as i128))).split();
 
     // assert_unsafe_precondition!(
     //     check_library_ub,
@@ -317,10 +316,7 @@ pub unsafe fn align_to<T, U>(self_: &[T]) -> (&[T], &[U], &[T]) {
         let (us_len, ts_len) = align_to_offsets::<T, U>(rest);
         // Inform Miri that we want to consider the "middle" pointer to be suitably aligned.
         #[cfg(miri)]
-        crate::intrinsics::miri_promise_symbolic_alignment(
-            rest.as_ptr().cast(),
-            align_of::<U>(),
-        );
+        crate::intrinsics::miri_promise_symbolic_alignment(rest.as_ptr().cast(), align_of::<U>());
         // SAFETY: now `rest` is definitely aligned, so `from_raw_parts` below is okay,
         // since the caller guarantees that we can transmute `T` to `U` safely.
         unsafe {
@@ -423,7 +419,9 @@ pub fn split_first_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T; N], &[T
 #[trusted]
 #[requires(false)]
 /* pub const */
-pub fn split_first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut [T; N], &mut [T])> {
+pub fn split_first_chunk_mut<T, const N: usize>(
+    self_: &mut [T],
+) -> Option<(&mut [T; N], &mut [T])> {
     let Some((first, tail)) = self_.split_at_mut_checked(N) else {
         return None;
     };
@@ -878,7 +876,9 @@ where
 }
 
 #[trusted]
-pub fn as_simd_mut<T, const LANES: usize>(self_: &mut [T]) -> (&mut [T], &mut [Simd<T, LANES>], &mut [T])
+pub fn as_simd_mut<T, const LANES: usize>(
+    self_: &mut [T],
+) -> (&mut [T], &mut [Simd<T, LANES>], &mut [T])
 where
     Simd<T, LANES>: AsMut<[T; LANES]>,
     T: simd::SimdElement,
