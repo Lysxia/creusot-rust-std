@@ -18,9 +18,10 @@ macro_rules! assert_unsafe_precondition {
             #[rustc_nounwind]
             const fn precondition_check($($name:$ty),*) {
                 if !$e {
-                    ::core::panicking::panic_nounwind(
-                        concat!("unsafe precondition(s) violated: ", $message)
-                    );
+                    let msg = concat!("unsafe precondition(s) violated: ", $message,
+                        "\n\nThis indicates a bug in the program. \
+                        This Undefined Behavior check is optional, and cannot be relied on for safety.");
+                    ::core::panicking::panic_nounwind_fmt(::core::fmt::Arguments::new_const(&[msg]), false);
                 }
             }
 
@@ -33,7 +34,7 @@ macro_rules! assert_unsafe_precondition {
 pub use assert_unsafe_precondition;
 
 #[trusted]
-#[erasure("core::ub_checks::check_language_ub")]
+#[erasure(private core::ub_checks::check_language_ub)]
 pub(crate) fn check_language_ub() -> bool {
     // Only used for UB checks so we may const_eval_select.
     // intrinsics::ub_checks()
@@ -50,7 +51,7 @@ pub(crate) fn check_language_ub() -> bool {
     true
 }
 
-#[erasure("core::ub_checks::maybe_is_aligned_and_not_null")]
+#[erasure(private core::ub_checks::maybe_is_aligned_and_not_null)]
 pub(crate) const fn maybe_is_aligned_and_not_null(
     ptr: *const (),
     align: usize,
@@ -60,7 +61,7 @@ pub(crate) const fn maybe_is_aligned_and_not_null(
     maybe_is_aligned(ptr, align) && (is_zst || !ptr.is_null())
 }
 
-#[erasure("core::ub_checks::maybe_is_aligned")]
+#[erasure(private core::ub_checks::maybe_is_aligned)]
 pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
     // This is just for safety checks so we can const_eval_select.
     const_eval_select!(
@@ -73,7 +74,7 @@ pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
     )
 }
 
-#[erasure("core::ub_checks::is_valid_allocation_size")]
+#[erasure(private core::ub_checks::is_valid_allocation_size)]
 pub(crate) const fn is_valid_allocation_size(size: usize, len: usize) -> bool {
     let max_len = if size == 0 {
         usize::MAX
