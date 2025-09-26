@@ -37,18 +37,17 @@ pub use assert_unsafe_precondition;
 #[erasure(private core::ub_checks::check_language_ub)]
 pub(crate) fn check_language_ub() -> bool {
     // Only used for UB checks so we may const_eval_select.
-    // intrinsics::ub_checks()
-    //     && const_eval_select!(
-    //         @capture { } -> bool:
-    //         if const {
-    //             // Always disable UB checks.
-    //             false
-    //         } else {
-    //             // Disable UB checks in Miri.
-    //             !cfg!(miri)
-    //         }
-    //     )
-    true
+    core::intrinsics::ub_checks()
+        && const_eval_select!(
+            @capture { } -> bool:
+            if const {
+                // Always disable UB checks.
+                false
+            } else {
+                // Disable UB checks in Miri.
+                !cfg!(miri)
+            }
+        )
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned_and_not_null)]
