@@ -261,8 +261,7 @@ pub enum DisjointOrEqual<'a, T> {
 }
 
 impl<'a, T> DisjointOrEqual<'a, T> {
-    #[logic]
-    #[open]
+    #[logic(open)]
     pub fn left(self) -> &'a mut PtrOwn<T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
@@ -270,8 +269,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 
-    #[logic]
-    #[open]
+    #[logic(open)]
     pub fn right(self) -> &'a mut PtrOwn<T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
