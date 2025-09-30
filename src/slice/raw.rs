@@ -2,8 +2,8 @@ use crate::ub_checks;
 use ::std::ptr;
 use creusot_contracts::{ghost::PtrOwn, *};
 
+#[requires(data.is_aligned_logic())]
 #[requires(own.ptr().as_ptr_logic() == data)]
-#[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
 #[erasure(::std::slice::from_raw_parts)]
@@ -17,6 +17,7 @@ pub unsafe fn from_raw_parts_own<'a, T>(
         ub_checks::assert_unsafe_precondition!(
             check_language_ub,
             "slice::from_raw_parts requires the pointer to be aligned and non-null, and the total size of the slice not to exceed `isize::MAX`",
+            pearlite!{ data.is_aligned_to_logic(align@) && !data.is_null_logic() && (size@ > 0 ==> len@ <= isize::MAX@ / size@) },
             (
                 data: *mut () = data as *mut (),
                 size: usize = size_of::<T>(),
@@ -30,8 +31,8 @@ pub unsafe fn from_raw_parts_own<'a, T>(
     }
 }
 
+#[requires(data.is_aligned_logic())]
 #[requires(own.ptr().as_ptr_logic() == data as *const T)]
-#[requires(own.ptr().len_logic() == own.len())]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
 #[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data as *const T)]
@@ -47,6 +48,7 @@ pub unsafe fn from_raw_parts_mut_own<T>(
         ub_checks::assert_unsafe_precondition!(
             check_language_ub,
             "slice::from_raw_parts_mut requires the pointer to be aligned and non-null, and the total size of the slice not to exceed `isize::MAX`",
+            pearlite!{ data.is_aligned_to_logic(align@) && !data.is_null_logic() && (size@ > 0 ==> len@ <= isize::MAX@ / size@) },
             (
                 data: *mut () = data as *mut (),
                 size: usize = size_of::<T>(),

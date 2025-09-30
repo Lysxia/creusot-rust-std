@@ -3,7 +3,7 @@ use creusot_contracts::*;
 
 #[macro_export]
 macro_rules! assert_unsafe_precondition {
-    ($kind:ident, $message:expr, ($($name:ident:$ty:ty = $arg:expr),*$(,)?) => $e:expr $(,)?) => {
+    ($kind:ident, $message:expr, $pre:expr, ($($name:ident:$ty:ty = $arg:expr),*$(,)?) => $e:expr $(,)?) => {
         {
             // This check is inlineable, but not by the MIR inliner.
             // The reason for this is that the MIR inliner is in an exceptionally bad position
@@ -16,6 +16,7 @@ macro_rules! assert_unsafe_precondition {
             #[rustc_no_mir_inline]
             #[inline]
             #[rustc_nounwind]
+            #[requires($pre)]
             const fn precondition_check($($name:$ty),*) {
                 if !$e {
                     let msg = concat!("unsafe precondition(s) violated: ", $message,
@@ -51,6 +52,7 @@ pub(crate) fn check_language_ub() -> bool {
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned_and_not_null)]
+#[ensures(ptr.is_aligned_to_logic(align@) && (is_zst || !ptr.is_null_logic()) ==> result)]
 pub(crate) const fn maybe_is_aligned_and_not_null(
     ptr: *const (),
     align: usize,
@@ -61,6 +63,7 @@ pub(crate) const fn maybe_is_aligned_and_not_null(
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned)]
+#[ensures(ptr.is_aligned_to_logic(align@) ==> result)]
 pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
     // This is just for safety checks so we can const_eval_select.
     const_eval_select!(
@@ -74,6 +77,7 @@ pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
 }
 
 #[erasure(private core::ub_checks::is_valid_allocation_size)]
+#[ensures((size@ > 0 ==> len@ <= isize::MAX@ / size@) == result)]
 pub(crate) const fn is_valid_allocation_size(size: usize, len: usize) -> bool {
     let max_len = if size == 0 {
         usize::MAX
