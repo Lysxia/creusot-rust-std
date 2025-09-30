@@ -303,6 +303,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
+    // #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked)]
     #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 == result.1.ptr())]

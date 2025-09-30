@@ -18,7 +18,9 @@ macro_rules! assert_unsafe_precondition {
             #[rustc_nounwind]
             #[requires($pre)]
             const fn precondition_check($($name:$ty),*) {
-                if !$e {
+                // Add parentheses because this gets re-parsed by syn (via `requires`),
+                // which interprets the expansion of `!$e` differently from the original `assert_unsafe_precondition`.
+                if !($e) {
                     let msg = concat!("unsafe precondition(s) violated: ", $message,
                         "\n\nThis indicates a bug in the program. \
                         This Undefined Behavior check is optional, and cannot be relied on for safety.");
@@ -33,6 +35,7 @@ macro_rules! assert_unsafe_precondition {
     };
 }
 pub use assert_unsafe_precondition;
+pub use core::intrinsics::ub_checks as check_library_ub;
 
 #[trusted]
 #[erasure(private core::ub_checks::check_language_ub)]

@@ -9,7 +9,9 @@
     pointer_is_aligned_to,
     core_intrinsics,
     decl_macro,
-    const_eval_select
+    const_eval_select,
+    slice_swap_unchecked,
+    slice_index_methods,
 )]
 pub mod intrinsics;
 pub mod ops;

@@ -14,7 +14,7 @@ use creusot_contracts::{Clone, PartialEq, *};
 // use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeBounds, RangeInclusive};
 // use core::panic::const_panic;
-use crate::ptr as vptr;
+use crate::{assert_unsafe_precondition, ptr as vptr};
 use core::simd::{self, Simd};
 use core::{hint /* range, */, ptr};
 
@@ -91,6 +91,7 @@ pub fn block_get_2_ghost<T>(
 //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
 //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
+// #[erasure(<[T]>::get_unchecked::<I>)]
 #[requires(index.in_bounds(*self_))]
 #[ensures(index.slice_index(*self_, *result))]
 pub unsafe fn get_unchecked<T, I>(self_: &[T], index: I) -> &I::Output
@@ -107,6 +108,7 @@ where
     }
 }
 
+// #[erasure(<[T]>::get_unchecked_mut::<I>)]
 #[requires(index.in_bounds(*self_))]
 #[ensures(index.slice_index(*self_, *result))]
 #[ensures(index.slice_index(^self_, ^result))]
@@ -127,18 +129,20 @@ where
 
 // `s.exchange(t, i, j)` says precisely that `s: Seq<T>` is the result of exchanging
 // elements at indices `i` and `j` in `t`.
+#[erasure(<[T]>::swap_unchecked)]
 #[requires(a@ < self_@.len() && b@ < self_@.len())]
 #[ensures((^self_)@.exchange(self_@, a@, b@))]
 pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
-    // assert_unsafe_precondition!(
-    //     check_library_ub,
-    //     "slice::swap_unchecked requires that the indices are within the slice",
-    //     (
-    //         len: usize = self.len(),
-    //         a: usize = a,
-    //         b: usize = b,
-    //     ) => a < len && b < len,
-    // );
+    assert_unsafe_precondition!(
+        check_library_ub,
+        "slice::swap_unchecked requires that the indices are within the slice",
+        pearlite! { a < len && b < len },
+        (
+            len: usize = self_.len(),
+            a: usize = a,
+            b: usize = b,
+        ) => a < len && b < len,
+    );
 
     let (ptr, mut owns) = self_.as_mut_ptr_own();
     let own = ghost! {
@@ -166,11 +170,12 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
 #[trusted]
 #[requires(false)]
 pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
-    // assert_unsafe_precondition!(
-    //     check_language_ub,
-    //     "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
-    //     (n: usize = N, len: usize = self.len()) => n != 0 && len % n == 0,
-    // );
+    assert_unsafe_precondition!(
+        check_language_ub,
+        "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
+        pearlite! { n@ != 0 && len@ % n@ == 0 },
+        (n: usize = N, len: usize = self_.len()) => n != 0 && len % n == 0,
+    );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
     // SAFETY: We cast a slice of `new_len * N` elements into
@@ -181,11 +186,12 @@ pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
 #[trusted]
 #[requires(false)]
 pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mut [[T; N]] {
-    // assert_unsafe_precondition!(
-    //     check_language_ub,
-    //     "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
-    //     (n: usize = N, len: usize = self.len()) => n != 0 && len % n == 0
-    // );
+    assert_unsafe_precondition!(
+        check_language_ub,
+        "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
+        pearlite! { n@ != 0 && len@ % n@ == 0 },
+        (n: usize = N, len: usize = self_.len()) => n != 0 && len % n == 0
+    );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
     // SAFETY: We cast a slice of `new_len * N` elements into
@@ -193,6 +199,7 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
     unsafe { from_raw_parts_mut(self_.as_mut_ptr().cast(), new_len) }
 }
 
+#[erasure(<[T]>::split_at_unchecked)]
 #[requires(mid@ <= self_@.len())]
 #[ensures(self_@.subsequence(0, mid@) == result.0@)]
 #[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
@@ -205,11 +212,12 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     let (ptr, owns) = self_.as_ptr_own();
     let (owns0, owns1) = ghost!(owns.into_inner().split_at_ghost(*Int::new(mid as i128))).split();
 
-    // assert_unsafe_precondition!(
-    //     check_library_ub,
-    //     "slice::split_at_unchecked requires the index to be within the slice",
-    //     (mid: usize = mid, len: usize = len) => mid <= len,
-    // );
+    assert_unsafe_precondition!(
+        check_library_ub,
+        "slice::split_at_unchecked requires the index to be within the slice",
+        pearlite!{ mid <= len },
+        (mid: usize = mid, len: usize = len) => mid <= len,
+    );
 
     // SAFETY: Caller has to check that `0 <= mid <= self.len()`
     unsafe {
@@ -221,6 +229,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 }
 
 /* pub const */
+#[erasure(<[T]>::split_at_mut_unchecked)]
 #[requires(mid@ <= self_@.len())]
 #[ensures(self_@.subsequence(0, mid@) == result.0@)]
 #[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
@@ -234,11 +243,12 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     }
     .split();
 
-    // assert_unsafe_precondition!(
-    //     check_library_ub,
-    //     "slice::split_at_mut_unchecked requires the index to be within the slice",
-    //     (mid: usize = mid, len: usize = len) => mid <= len,
-    // );
+    assert_unsafe_precondition!(
+        check_library_ub,
+        "slice::split_at_mut_unchecked requires the index to be within the slice",
+        pearlite!{ mid <= len },
+        (mid: usize = mid, len: usize = len) => mid <= len,
+    );
 
     // SAFETY: Caller has to check that `0 <= mid <= self_.len()`.
     //
@@ -580,6 +590,7 @@ pub fn as_chunks_mut<T, const N: usize>(self_: &mut [T]) -> (&mut [[T; N]], &mut
 }
 
 /* pub const */
+#[erasure(<[T]>::split_at_checked)]
 pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
     if mid <= self_.len() {
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self_`, which
@@ -591,6 +602,7 @@ pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
 }
 
 /* pub const */
+#[erasure(<[T]>::split_at_mut_checked)]
 pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T], &mut [T])> {
     if mid <= self_.len() {
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self_`, which
