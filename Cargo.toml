@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-creusot-contracts = "0.6.0-dev"
+creusot-contracts = "0.7.0-dev"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(creusot)'] }
