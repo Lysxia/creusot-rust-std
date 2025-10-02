@@ -55,7 +55,7 @@ pub(crate) fn check_language_ub() -> bool {
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned_and_not_null)]
-#[ensures(ptr.is_aligned_to_logic(align@) && (is_zst || !ptr.is_null_logic()) ==> result)]
+#[ensures(ptr.is_aligned_to_logic(align) && (is_zst || !ptr.is_null_logic()) ==> result)]
 pub(crate) const fn maybe_is_aligned_and_not_null(
     ptr: *const (),
     align: usize,
@@ -66,7 +66,7 @@ pub(crate) const fn maybe_is_aligned_and_not_null(
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned)]
-#[ensures(ptr.is_aligned_to_logic(align@) ==> result)]
+#[ensures(ptr.is_aligned_to_logic(align) ==> result)]
 pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
     // This is just for safety checks so we can const_eval_select.
     const_eval_select!(

@@ -12,5 +12,6 @@ TARGETS="\
   left_mut_ghost \
   right_mut_ghost \
   left_ghost \
-  right_ghost"
+  right_ghost \
+  div_mono_lemma"
 cargo creusot prove $TARGETS
