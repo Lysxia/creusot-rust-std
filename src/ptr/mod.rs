@@ -247,12 +247,13 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 /// Specifying `ptr::swap` so that it allows overlapping pointers is future work.
 #[allow(unused_variables)]
 #[trusted]
-#[requires(a == own.left().ptr() && b == own.right().ptr())]
+#[erasure(::std::ptr::swap)]
+#[requires(a as *const T == own.left().ptr() && b as *const T == own.right().ptr())]
 #[ensures((^own.left()).ptr() == own.left().ptr() && (^own.left()).val() == own.right().val())]
 #[ensures((^own.right()).ptr() == own.right().ptr() && (^own.right()).val() == own.left().val())]
-pub unsafe fn swap_disjoint<T>(a: *const T, b: *const T, own: Ghost<DisjointOrEqual<T>>) {
+pub unsafe fn swap_disjoint<T>(a: *mut T, b: *mut T, own: Ghost<DisjointOrEqual<T>>) {
     // SAFETY: `a` and `b` are disjoint pointers, so this is safe.
-    unsafe { ::std::ptr::swap(a.cast_mut(), b.cast_mut()) }
+    unsafe { ::std::ptr::swap(a, b) }
 }
 
 pub enum DisjointOrEqual<'a, T> {

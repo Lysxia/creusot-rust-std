@@ -11,7 +11,7 @@
     decl_macro,
     const_eval_select,
     slice_swap_unchecked,
-    slice_index_methods,
+    slice_index_methods
 )]
 pub mod intrinsics;
 pub mod ops;

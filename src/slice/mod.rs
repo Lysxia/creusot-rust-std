@@ -160,8 +160,8 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
     // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
     unsafe {
         vptr::swap_disjoint(
-            ptr.add_own(a, ghost!(own.left_ghost().as_slice_own_ref_ghost())),
-            ptr.add_own(b, ghost!(own.right_ghost().as_slice_own_ref_ghost())),
+            (ptr as *mut T).add_own(a, ghost!(own.left_ghost().as_slice_own_ref_ghost())),
+            (ptr as *mut T).add_own(b, ghost!(own.right_ghost().as_slice_own_ref_ghost())),
             own,
         );
     }
@@ -223,7 +223,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     unsafe {
         (
             from_raw_parts_own(ptr, mid, owns0),
-            from_raw_parts_own(ptr.add_own(mid, owns1), len.unchecked_sub(mid), owns1),
+            from_raw_parts_own(ptr.add_own(mid, owns1), unchecked_sub(len, mid), owns1),
         )
     }
 }
@@ -258,8 +258,8 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
         (
             from_raw_parts_mut_own(ptr as *mut T, mid, owns0),
             from_raw_parts_mut_own(
-                ptr.add_own(mid, ghost!(*owns1)) as *mut T,
-                len.unchecked_sub(mid),
+                (ptr as *mut T).add_own(mid, ghost!(*owns1)) as *mut T,
+                unchecked_sub(len, mid),
                 owns1,
             ),
         )

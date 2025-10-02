@@ -26,8 +26,13 @@ pub const unsafe fn unchecked_shr<T: Copy, U: Copy>(x: T, y: U) -> T {
     panic!("intrinsics")
 }
 
-pub const unsafe fn unchecked_sub<T: Copy>(x: T, y: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost)]
+#[erasure(::core::intrinsics::unchecked_sub)]
+#[requires(0 <= x@ - y@)]
+#[ensures(result@ == x@ - y@)]
+pub const unsafe fn unchecked_sub(x: usize, y: usize) -> usize {
+    unsafe { ::core::intrinsics::unchecked_sub(x, y) }
 }
 
 pub const fn wrapping_add<T: Copy>(a: T, b: T) -> T {
