@@ -19,6 +19,8 @@ where
     type Output = I::Output;
 
     #[inline(always)]
+    #[requires(index.in_bounds(*self))]
+    #[ensures(index.slice_index(*self, *result))]
     fn index(&self, index: I) -> &I::Output {
         index.index(self)
     }
@@ -30,6 +32,10 @@ where
     I: SliceIndex<[T]>,
 {
     #[inline(always)]
+    #[requires(index.in_bounds(*self))]
+    #[ensures(index.slice_index(*self, *result))]
+    #[ensures(index.slice_index(^self, ^result))]
+    #[ensures(index.resolve_elsewhere(*self, ^self))]
     fn index_mut(&mut self, index: I) -> &mut I::Output {
         index.index_mut(self)
     }
@@ -39,6 +45,7 @@ where
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused)]
+#[requires(false)]
 const fn slice_start_index_len_fail(index: usize, len: usize) -> ! {
     // const_panic!(
     //     "slice start index is out of range for slice",
@@ -53,6 +60,7 @@ const fn slice_start_index_len_fail(index: usize, len: usize) -> ! {
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused_variables)]
+#[requires(false)]
 const fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
     // const_panic!(
     //     "slice end index is out of range for slice",
@@ -67,6 +75,7 @@ const fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused_variables)]
+#[requires(false)]
 const fn slice_index_order_fail(index: usize, end: usize) -> ! {
     // const_panic!(
     //     "slice index start is larger than end",
@@ -80,6 +89,7 @@ const fn slice_index_order_fail(index: usize, end: usize) -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[requires(false)]
 const fn slice_start_index_overflow_fail() -> ! {
     panic!("attempted to index slice from after maximum usize");
 }
@@ -87,6 +97,7 @@ const fn slice_start_index_overflow_fail() -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[requires(false)]
 const fn slice_end_index_overflow_fail() -> ! {
     panic!("attempted to index slice up to maximum usize");
 }
@@ -254,12 +265,18 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &T) -> &Self::Output;
 
     /// Returns a mutable reference to the output at this location, panicking
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut T) -> &mut Self::Output;
 }
 
@@ -368,18 +385,18 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[inline]
-    #[requires(self@ < slice@.len())]
-    #[ensures(*result == slice@[self@])]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &T {
         // N.B., use intrinsic indexing
         &(*slice)[self]
     }
 
     #[inline]
-    #[requires(self@ < slice@.len())]
-    #[ensures(*result == (*slice)@[self@])]
-    #[ensures(^result == (^slice)@[self@])]
-    #[ensures(forall<i: Int> 0 <= i && i != self@ && i < slice@.len() ==> (*slice)@[i] == (^slice)@[i])]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut T {
         // N.B., use intrinsic indexing
         &mut (*slice)[self]
@@ -939,6 +956,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 // #[unstable(feature = "slice_range", issue = "76393")]
 */
 #[must_use]
+#[requires(false)]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
     R: ops::RangeBounds<usize>,
