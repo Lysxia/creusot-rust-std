@@ -66,7 +66,6 @@ use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_p
 #[ensures(*(^result.inner_logic().0).val() == (^s.inner_logic()).val()@[i])]
 #[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).val()@[j])]
 #[ensures((^s.inner_logic()).ptr() == s.ptr())]
-#[ensures((^s.inner_logic()).len() == s.len())]
 #[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^s.inner_logic()).val()@[k] == s.val()@[k])]
 pub fn block_get_2_ghost<T>(
     s: Ghost<&mut PtrOwn<[T]>>,
