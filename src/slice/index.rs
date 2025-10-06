@@ -3,8 +3,12 @@
 // use core::panic::const_panic;
 // use core::ub_checks::assert_unsafe_precondition;
 // use core::{ops, range};
-
+use crate::intrinsics::{
+    slice_get_unchecked_mut, slice_get_unchecked_raw, slice_get_unchecked_raw_mut,
+    slice_get_unchecked_ref,
+};
 use crate::ops;
+use crate::assert_unsafe_precondition;
 use creusot_contracts::{ghost::PtrOwn, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
@@ -216,8 +220,6 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-    // TODO invariant #[requires(own.len() == own.ptr().len_logic())]
-    // This does not type check here because we don't know that `T = [T0]` for some `T0`.
     #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 == result.1.ptr())]
@@ -281,23 +283,32 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         pearlite! { forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
     }
 
-    #[trusted]
     #[inline]
+    #[ensures(match result {
+        None => slice@.len() <= self@,
+        Some(item) => self@ < slice@.len() && *item == slice@[self@],
+    })]
     fn get(self, slice: &[T]) -> Option<&T> {
         // SAFETY: `self` is checked to be in bounds.
         if self < slice.len() {
-            unsafe { Some(todo!("&*get_noubcheck(slice, self)")) }
+            unsafe { Some(&*slice_get_unchecked_ref(slice, self)) }
         } else {
             None
         }
     }
 
-    #[trusted]
     #[inline]
+    #[ensures(match result {
+        None => slice@.len() <= self@,
+        Some(item) => self@ < slice@.len()
+            && *item == (*slice)@[self@]
+            && ^item == (^slice)@[self@]
+            && forall<i: Int> i != self@ ==> (*slice)@.get(i) == (^slice)@.get(i),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut T> {
         if self < slice.len() {
             // SAFETY: `self` is checked to be in bounds.
-            unsafe { todo!("Some(&mut *get_mut_noubcheck(slice, self))") }
+            unsafe { Some(&mut *slice_get_unchecked_mut(slice, self)) }
         } else {
             None
         }
@@ -313,13 +324,22 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         slice: *const [T],
         own: Ghost<&PtrOwn<[T]>>,
     ) -> (*const T, Ghost<&PtrOwn<T>>) {
+        assert_unsafe_precondition!(
+            check_language_ub,
+            "slice::get_unchecked requires that the index is within the slice",
+            pearlite! { this < len },
+            (this: usize = self, len: usize = slice.len()) => this < len
+        );
+        // SAFETY: the caller guarantees that `slice` is not dangling, so it
+        // cannot be longer than `isize::MAX`. They also guarantee that
+        // `self` is in bounds of `slice` so `self` cannot overflow an `isize`,
+        // so the call to `add` is safe.
         unsafe {
-            ::std::hint::assert_unchecked(self < slice.len());
-            let own = ghost! { own.split_at_ghost(*Int::new(self as i128)).1 };
-            (
-                get_noubcheck(slice, self, own),
-                ghost!(own.as_ptr_own_ref_ghost()),
-            )
+            // Use intrinsics::assume instead of hint::assert_unchecked so that we don't check the
+            // precondition of this function twice.
+            core::intrinsics::assume(self < slice.len());
+            let ptr = slice_get_unchecked_raw(slice, self, own);
+            (ptr, ghost! { own.index_ptr_own_ref_ghost(*Int::new(self as i128)) })
         }
     }
 
@@ -334,27 +354,32 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         slice: *mut [T],
         own: Ghost<&mut PtrOwn<[T]>>,
     ) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
+        assert_unsafe_precondition!(
+            check_library_ub,
+            "slice::get_unchecked_mut requires that the index is within the slice",
+            pearlite! { this < len },
+            (this: usize = self, len: usize = slice.len()) => this < len
+        );
+        // SAFETY: see comments for `get_unchecked` above.
         unsafe {
-            ::std::hint::assert_unchecked(self < slice.len());
-            let own = ghost! { own.into_inner().split_at_mut_ghost(*Int::new(self as i128)) }
-                .split()
-                .1;
-            (
-                get_mut_noubcheck(slice, self, ghost!(&*own)),
-                ghost!(own.into_inner().as_ptr_own_mut_ghost()),
-            )
+            let ptr = slice_get_unchecked_raw_mut(slice, self, ghost! { &**own });
+            (ptr, ghost! { own.into_inner().index_ptr_own_mut_ghost(*Int::new(self as i128)) })
         }
     }
 
-    #[trusted]
     #[inline]
+    #[requires(self@ < slice@.len())]
+    #[ensures(*result == slice@[self@])]
     fn index(self, slice: &[T]) -> &T {
         // N.B., use intrinsic indexing
         &(*slice)[self]
     }
 
-    #[trusted]
     #[inline]
+    #[requires(self@ < slice@.len())]
+    #[ensures(*result == (*slice)@[self@])]
+    #[ensures(^result == (^slice)@[self@])]
+    #[ensures(forall<i: Int> 0 <= i && i != self@ && i < slice@.len() ==> (*slice)@[i] == (^slice)@[i])]
     fn index_mut(self, slice: &mut [T]) -> &mut T {
         // N.B., use intrinsic indexing
         &mut (*slice)[self]

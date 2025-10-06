@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 pub use ::core::intrinsics::const_eval_select;
-use creusot_contracts::*;
+use creusot_contracts::{ghost::PtrOwn, *};
 
 pub const unsafe fn exact_div<T: Copy>(x: T, y: T) -> T {
     panic!("intrinsics")
@@ -27,7 +27,7 @@ pub const unsafe fn unchecked_shr<T: Copy, U: Copy>(x: T, y: U) -> T {
 }
 
 #[trusted]
-#[check(ghost)]
+#[check(ghost_trusted)]
 #[erasure(::core::intrinsics::unchecked_sub)]
 #[requires(0 <= x@ - y@)]
 #[ensures(result@ == x@ - y@)]
@@ -45,6 +45,47 @@ pub const fn wrapping_mul<T: Copy>(a: T, b: T) -> T {
 
 pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
     panic!("intrinsics")
+}
+
+#[trusted]
+#[erasure(core::intrinsics::slice_get_unchecked::<&T, &[T], T>)]
+#[requires(index@ < slice@.len())]
+#[ensures(*result == slice@[index@])]
+pub unsafe fn slice_get_unchecked_ref<T>(slice: &[T], index: usize) -> &T {
+    unsafe { core::intrinsics::slice_get_unchecked(slice, index) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::slice_get_unchecked::<&mut T, &mut [T], T>)]
+#[requires(index@ < slice@.len())]
+#[ensures(*result == (*slice)@[index@])]
+#[ensures(^result == (^slice)@[index@])]
+#[ensures(forall<i: Int> i != index@ ==> (*slice)@.get(i) == (^slice)@.get(i))]
+pub unsafe fn slice_get_unchecked_mut<T>(slice: &mut [T], index: usize) -> &mut T {
+    unsafe { core::intrinsics::slice_get_unchecked(slice, index) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::slice_get_unchecked::<*const T, *const [T], T>)]
+#[requires(own.ptr() == ptr)]
+#[requires(index@ < ptr.len_logic())]
+#[ensures(result == (ptr as *const T).offset_logic(index@))]
+pub unsafe fn slice_get_unchecked_raw<T>(
+    ptr: *const [T],
+    index: usize,
+    own: Ghost<&PtrOwn<[T]>>,
+) -> *const T {
+    unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
+}
+
+/// This only needs a `&PtrOwn` instead of `&mut PtrOwn` because it doesn't mutate anything.
+#[trusted]
+#[erasure(core::intrinsics::slice_get_unchecked::<*mut T, *mut [T], T>)]
+#[requires(own.ptr() == ptr as *const [T])]
+#[requires(index@ < ptr.len_logic())]
+#[ensures(result == (ptr as *const T).offset_logic(index@) as *mut T)]
+pub unsafe fn slice_get_unchecked_raw_mut<T>(ptr: *mut [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
+    unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
 
 pub(crate) macro const_eval_select {
