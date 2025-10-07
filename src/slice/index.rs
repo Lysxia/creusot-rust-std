@@ -542,10 +542,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_ref(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                Some(PtrOwn::as_ref(
-                    get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own }),
-                    ghost! { todo!() },
-                ))
+                let item_ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                Some(PtrOwn::as_ref(item_ptr, ghost! { todo!() }))
             }
         } else {
             None
@@ -560,15 +558,13 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_mut(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                Some(PtrOwn::as_mut(
-                    get_offset_len_mut_noubcheck(
-                        ptr as *mut [T],
-                        self.start,
-                        new_len,
-                        ghost! { *own },
-                    ),
-                    ghost! { todo!() },
-                ))
+                let item_ptr = get_offset_len_mut_noubcheck(
+                    ptr as *mut [T],
+                    self.start,
+                    new_len,
+                    ghost! { *own },
+                );
+                Some(PtrOwn::as_mut(item_ptr, ghost! { todo!() }))
             }
         } else {
             None
