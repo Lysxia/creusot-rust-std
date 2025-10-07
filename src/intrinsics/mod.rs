@@ -48,6 +48,25 @@ pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
 }
 
 #[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(own.ptr().as_ptr_logic() == dst)]
+#[requires(own.len() <= offset@)]
+#[ensures(own.ptr().as_ptr_logic().offset_logic(offset@) == result)]
+pub unsafe fn offset_own<T>(dst: *const T, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> *const T {
+    unsafe { core::intrinsics::offset(dst, offset) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(own.ptr().as_ptr_logic() == dst as *const T)]
+#[requires(own.len() <= offset@)]
+#[ensures(own.ptr().as_ptr_logic().offset_logic(offset@) == result as *const T)]
+pub unsafe fn offset_own_mut<T>(dst: *mut T, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
+    unsafe { core::intrinsics::offset(dst, offset) }
+}
+
+// TODO: can Creusot read the MIR of these intrinsics?
+#[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<&T, &[T], T>)]
 #[requires(index@ < slice@.len())]
 #[ensures(*result == slice@[index@])]
@@ -84,7 +103,11 @@ pub unsafe fn slice_get_unchecked_raw<T>(
 #[requires(own.ptr() == ptr as *const [T])]
 #[requires(index@ < ptr.len_logic())]
 #[ensures(result == (ptr as *const T).offset_logic(index@) as *mut T)]
-pub unsafe fn slice_get_unchecked_raw_mut<T>(ptr: *mut [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
+pub unsafe fn slice_get_unchecked_raw_mut<T>(
+    ptr: *mut [T],
+    index: usize,
+    own: Ghost<&PtrOwn<[T]>>,
+) -> *mut T {
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
 
