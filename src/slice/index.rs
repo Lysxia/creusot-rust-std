@@ -223,11 +223,19 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// Returns a shared reference to the output at this location, if in
     /// bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &T) -> Option<&Self::Output>;
 
     /// Returns a mutable reference to the output at this location, if in
     /// bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut T) -> Option<&mut Self::Output>;
 
     /// Returns a pointer to the output at this location, without
@@ -492,7 +500,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
 #[check(ghost)]
 #[requires(start <= end && end@ <= own.len())]
 #[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
-#[ensures(result.len() == end@ - start@)]
+#[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
 fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost<&PtrOwn<[T]>> {
     ghost! {
         let (own, _) = own.into_inner().split_at_ghost(*Int::new(end as i128));
@@ -504,7 +512,10 @@ fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost
 #[check(ghost)]
 #[requires(start <= end && end@ <= own.len())]
 #[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
-#[ensures(result.len() == end@ - start@)]
+#[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
+#[ensures((^result).ptr() as *const T == ((^own).ptr() as *const T).offset_logic(start@))]
+#[ensures((^result).val()@ == (^own).val()@.subsequence(start@, end@))]
+#[ensures(forall<i: Int> i < start@ || end@ <= i ==> own.val()@.get(i) == (^own).val()@.get(i))]
 fn ptr_own_slice_mut<T>(
     own: Ghost<&mut PtrOwn<[T]>>,
     start: usize,
@@ -536,12 +547,17 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[logic]
     fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
-        pearlite! { old@.len() == fin@.len()
-        && forall<i: Int> 0 <= i && (i < self.start@ || self.end@ <= i) && i < old@.len()
-            ==> old@[i] == fin@[i] }
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < self.start@ || self.end@ <= i ==> old@.get(i) == fin@.get(i)
+        }
     }
 
     #[inline]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         // Using checked_sub is a safe way to get `SubUnchecked` in MIR
         if let Some(new_len) = usize::checked_sub(self.end, self.start)
@@ -560,6 +576,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     }
 
     #[inline]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         if let Some(new_len) = usize::checked_sub(self.end, self.start)
             && self.end <= slice.len()
@@ -582,6 +602,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     }
 
     #[inline]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     unsafe fn get_unchecked_own(
         self,
         slice: *const [T],
@@ -613,6 +637,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     }
 
     #[inline]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut [T],
@@ -638,6 +668,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     }
 
     #[inline(always)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         // Using checked_sub is a safe way to get `SubUnchecked` in MIR
         let Some(new_len) = usize::checked_sub(self.end, self.start) else {
@@ -656,6 +688,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     }
 
     #[inline]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         let Some(new_len) = usize::checked_sub(self.end, self.start) else {
             slice_index_order_fail(self.start, self.end)
