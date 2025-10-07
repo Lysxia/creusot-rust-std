@@ -312,7 +312,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
 
     #[logic]
     fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
-        pearlite! { forall<i: Int> 0 <= i && i < old@.len() && i != self@ ==> old@[i] == fin@[i] }
+        pearlite! { forall<i: Int> i != self@ ==> old@.get(i) == fin@.get(i) }
     }
 
     #[inline]
@@ -331,11 +331,8 @@ unsafe impl<T> SliceIndex<[T]> for usize {
 
     #[inline]
     #[ensures(match result {
-        None => slice@.len() <= self@,
-        Some(item) => self@ < slice@.len()
-            && *item == (*slice)@[self@]
-            && ^item == (^slice)@[self@]
-            && forall<i: Int> i != self@ ==> (*slice)@.get(i) == (^slice)@.get(i),
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
     })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut T> {
         if self < slice.len() {
@@ -513,7 +510,7 @@ fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost
 #[requires(start <= end && end@ <= own.len())]
 #[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
 #[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
-#[ensures((^result).ptr() as *const T == ((^own).ptr() as *const T).offset_logic(start@))]
+#[ensures(own.ptr() == (^own).ptr())]
 #[ensures((^result).val()@ == (^own).val()@.subsequence(start@, end@))]
 #[ensures(forall<i: Int> i < start@ || end@ <= i ==> own.val()@.get(i) == (^own).val()@.get(i))]
 fn ptr_own_slice_mut<T>(
