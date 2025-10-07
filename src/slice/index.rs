@@ -89,6 +89,49 @@ const fn slice_index_order_fail(index: usize, end: usize) -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[erasure(private core::slice::index::slice_index_fail)]
+#[requires(false)]
+const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
+    todo!()
+    // if start > len {
+    //     const_panic!(
+    //         "slice start index is out of range for slice",
+    //         "range start index {start} out of range for slice of length {len}",
+    //         start: usize,
+    //         len: usize,
+    //     )
+    // }
+
+    // if end > len {
+    //     const_panic!(
+    //         "slice end index is out of range for slice",
+    //         "range end index {end} out of range for slice of length {len}",
+    //         end: usize,
+    //         len: usize,
+    //     )
+    // }
+
+    // if start > end {
+    //     const_panic!(
+    //         "slice index start is larger than end",
+    //         "slice index starts at {start} but ends at {end}",
+    //         start: usize,
+    //         end: usize,
+    //     )
+    // }
+
+    // // Only reachable if the range was a `RangeInclusive` or a
+    // // `RangeToInclusive`, with `end == len`.
+    // const_panic!(
+    //     "slice end index is out of range for slice",
+    //     "range end index {end} out of range for slice of length {len}",
+    //     end: usize,
+    //     len: usize,
+    // )
+}
+// #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+// #[cfg_attr(feature = "panic_immediate_abort", inline)]
+#[track_caller]
 #[requires(false)]
 const fn slice_start_index_overflow_fail() -> ! {
     panic!("attempted to index slice from after maximum usize");
@@ -316,6 +359,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[inline]
+    #[erasure(<usize as core::slice::SliceIndex<[T]>>::get)]
     #[ensures(match result {
         None => slice@.len() <= self@,
         Some(item) => self@ < slice@.len() && *item == slice@[self@],
@@ -330,6 +374,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[inline]
+    #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_mut)]
     #[ensures(match result {
         None => !self.in_bounds(*slice) && resolve(slice),
         Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
@@ -343,7 +388,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
-    // #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked)]
     #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 == result.1.ptr())]
@@ -375,6 +420,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
+    #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
     #[requires(own.ptr() == slice as *const [T])]
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const T == result.1.ptr())]
@@ -402,6 +448,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         }
     }
 
+    //#[erasure(<usize as core::slice::SliceIndex<[T]>>::index)]
     #[inline]
     #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
@@ -410,6 +457,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         &(*slice)[self]
     }
 
+    //#[erasure(<usize as core::slice::SliceIndex<[T]>>::index_mut)]
     #[inline]
     #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
@@ -550,6 +598,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get)]
     #[inline]
     #[ensures(match result {
         None => !self.in_bounds(*slice),
@@ -572,6 +621,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get_mut)]
     #[inline]
     #[ensures(match result {
         None => !self.in_bounds(*slice) && resolve(slice),
@@ -598,6 +648,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked)]
     #[inline]
     #[requires(own.ptr() == slice)]
     #[requires(self.in_bounds(*own.val()))]
@@ -633,6 +684,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
     #[inline]
     #[requires(own.ptr() == slice as *const [T])]
     #[requires(self.in_bounds(*own.val()))]
@@ -664,45 +716,45 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index)]
     #[inline(always)]
     #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         // Using checked_sub is a safe way to get `SubUnchecked` in MIR
-        let Some(new_len) = usize::checked_sub(self.end, self.start) else {
-            slice_index_order_fail(self.start, self.end)
-        };
-        if self.end > slice.len() {
-            slice_end_index_len_fail(self.end, slice.len());
-        }
-        // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe {
-            let (ptr, own) = PtrOwn::from_ref(slice);
-            let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
-            let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
-            PtrOwn::as_ref(ptr, own)
+        if let Some(new_len) = usize::checked_sub(self.end, self.start)
+            && self.end <= slice.len()
+        {
+            // SAFETY: `self` is checked to be valid and in bounds above.
+            unsafe {
+                let (ptr, own) = PtrOwn::from_ref(slice);
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
+                PtrOwn::as_ref(ptr, own)
+            }
+        } else {
+            slice_index_fail(self.start, self.end, slice.len())
         }
     }
 
+    #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index_mut)]
     #[inline]
     #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
-        let Some(new_len) = usize::checked_sub(self.end, self.start) else {
-            slice_index_order_fail(self.start, self.end)
-        };
-        if self.end > slice.len() {
-            slice_end_index_len_fail(self.end, slice.len());
-        }
-        // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe {
-            let (ptr, own) = PtrOwn::from_mut(slice);
-            let ptr =
-                get_offset_len_mut_noubcheck(ptr as *mut [T], self.start, new_len, ghost! { *own });
-            let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
-            PtrOwn::as_mut(ptr, own)
+        if let Some(new_len) = usize::checked_sub(self.end, self.start) && self.end <= slice.len() {
+            // SAFETY: `self` is checked to be valid and in bounds above.
+            unsafe {
+                let (ptr, own) = PtrOwn::from_mut(slice);
+                let ptr =
+                    get_offset_len_mut_noubcheck(ptr as *mut [T], self.start, new_len, ghost! { *own });
+                let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
+                PtrOwn::as_mut(ptr, own)
+            }
+        } else {
+            slice_index_fail(self.start, self.end, slice.len())
         }
     }
 }
