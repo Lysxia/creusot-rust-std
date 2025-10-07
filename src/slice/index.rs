@@ -107,26 +107,6 @@ const fn slice_end_index_overflow_fail() -> ! {
 // Both the safe and unsafe public methods share these helpers,
 // which use intrinsics directly to get *no* extra checks.
 
-#[requires(ptr.as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
-#[ensures(ptr.as_ptr_logic().offset_logic(index@) == result)]
-#[inline(always)]
-/* const */
-unsafe fn get_noubcheck<T>(ptr: *const [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *const T {
-    let ptr = ptr as *const T;
-    // SAFETY: The caller already checked these preconditions
-    unsafe { ptr.add_own(index, own) }
-}
-
-#[requires((ptr as *const [T]).as_ptr_logic().offset_logic(index@) == own.ptr().as_ptr_logic())]
-#[ensures((ptr as *const [T]).as_ptr_logic().offset_logic(index@) == result as *const T)]
-#[inline(always)]
-/* const */
-unsafe fn get_mut_noubcheck<T>(ptr: *mut [T], index: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
-    let ptr = ptr as *mut T;
-    // SAFETY: The caller already checked these preconditions
-    unsafe { ptr.add_own(index, own) }
-}
-
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_noubcheck)]
 #[requires(own.ptr() == ptr)]
@@ -509,6 +489,34 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
     }
 } */
 
+#[check(ghost)]
+#[requires(start <= end && end@ <= own.len())]
+#[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
+#[ensures(result.len() == end@ - start@)]
+fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost<&PtrOwn<[T]>> {
+    ghost! {
+        let (own, _) = own.into_inner().split_at_ghost(*Int::new(end as i128));
+        let (_, own) = own.split_at_ghost(*Int::new(start as i128));
+        own
+    }
+}
+
+#[check(ghost)]
+#[requires(start <= end && end@ <= own.len())]
+#[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
+#[ensures(result.len() == end@ - start@)]
+fn ptr_own_slice_mut<T>(
+    own: Ghost<&mut PtrOwn<[T]>>,
+    start: usize,
+    end: usize,
+) -> Ghost<&mut PtrOwn<[T]>> {
+    ghost! {
+        let (own, _) = own.into_inner().split_at_mut_ghost(*Int::new(end as i128));
+        let (_, own) = own.split_at_mut_ghost(*Int::new(start as i128));
+        own
+    }
+}
+
 /// The methods `index` and `index_mut` panic if:
 /// - the start of the range is greater than the end of the range or
 /// - the end of the range is out of bounds.
@@ -542,8 +550,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_ref(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let item_ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
-                Some(PtrOwn::as_ref(item_ptr, ghost! { todo!() }))
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
+                Some(PtrOwn::as_ref(ptr, own))
             }
         } else {
             None
@@ -558,13 +567,14 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_mut(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let item_ptr = get_offset_len_mut_noubcheck(
+                let ptr = get_offset_len_mut_noubcheck(
                     ptr as *mut [T],
                     self.start,
                     new_len,
                     ghost! { *own },
                 );
-                Some(PtrOwn::as_mut(item_ptr, ghost! { todo!() }))
+                let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
+                Some(PtrOwn::as_mut(ptr, own))
             }
         } else {
             None
@@ -596,10 +606,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // Using the intrinsic avoids a superfluous UB check,
             // since the one on this method already checked `end >= start`.
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
-            (
-                get_offset_len_noubcheck(slice, self.start, new_len, ghost! { *own }),
-                ghost! { todo!() },
-            )
+            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { *own });
+            let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
+            (ptr, own)
         }
     }
 
@@ -622,10 +631,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         // SAFETY: see comments for `get_unchecked` above.
         unsafe {
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
-            (
-                get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { *own }),
-                ghost! { todo!() },
-            )
+            let ptr = get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { *own });
+            let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
+            (ptr, own)
         }
     }
 
@@ -639,7 +647,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             slice_end_index_len_fail(self.end, slice.len());
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe { &*get_offset_len_noubcheck(slice, self.start, new_len, ghost! {todo!()}) }
+        unsafe {
+            let (ptr, own) = PtrOwn::from_ref(slice);
+            let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+            let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
+            PtrOwn::as_ref(ptr, own)
+        }
     }
 
     #[inline]
@@ -651,7 +664,13 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             slice_end_index_len_fail(self.end, slice.len());
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe { &mut *get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! {todo!()}) }
+        unsafe {
+            let (ptr, own) = PtrOwn::from_mut(slice);
+            let ptr =
+                get_offset_len_mut_noubcheck(ptr as *mut [T], self.start, new_len, ghost! { *own });
+            let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
+            PtrOwn::as_mut(ptr, own)
+        }
     }
 }
 
