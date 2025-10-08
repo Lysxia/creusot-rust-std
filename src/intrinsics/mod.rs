@@ -70,7 +70,6 @@ pub unsafe fn offset_own_mut<T>(dst: *mut T, offset: usize, own: Ghost<&PtrOwn<[
     unsafe { core::intrinsics::offset(dst, offset) }
 }
 
-// TODO: can Creusot read the MIR of these intrinsics?
 #[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<&T, &[T], T>)]
 #[requires(index@ < slice@.len())]
