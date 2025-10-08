@@ -9,7 +9,9 @@ use crate::intrinsics::{
     slice_get_unchecked_ref,
 };
 use crate::ops;
-use creusot_contracts::{ghost::PtrOwn, std::ptr::metadata_logic, *};
+#[cfg(creusot)]
+use creusot_contracts::std::ptr::metadata_logic;
+use creusot_contracts::{ghost::PtrOwn, std::ops::RangeBounds, *};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -1188,10 +1190,11 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 // #[unstable(feature = "slice_range", issue = "76393")]
 */
 #[must_use]
+// #[erasure(private core::slice::index::range)]
 #[requires(false)]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
-    R: ops::RangeBounds<usize>,
+    R: RangeBounds<usize>,
 {
     let len = bounds.end;
 
