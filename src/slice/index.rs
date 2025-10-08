@@ -10,6 +10,8 @@ use crate::intrinsics::{
 };
 use crate::ops;
 #[cfg(creusot)]
+use core::ops::Bound;
+#[cfg(creusot)]
 use creusot_contracts::std::ptr::metadata_logic;
 use creusot_contracts::{ghost::PtrOwn, std::ops::RangeBounds, *};
 
@@ -47,6 +49,7 @@ where
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused)]
+#[check(ghost)]
 #[requires(false)]
 const fn slice_start_index_len_fail(index: usize, len: usize) -> ! {
     // const_panic!(
@@ -62,6 +65,7 @@ const fn slice_start_index_len_fail(index: usize, len: usize) -> ! {
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused_variables)]
+#[check(ghost)]
 #[requires(false)]
 const fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
     // const_panic!(
@@ -77,6 +81,7 @@ const fn slice_end_index_len_fail(index: usize, len: usize) -> ! {
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
 #[allow(unused_variables)]
+#[check(ghost)]
 #[requires(false)]
 const fn slice_index_order_fail(index: usize, end: usize) -> ! {
     // const_panic!(
@@ -91,6 +96,7 @@ const fn slice_index_order_fail(index: usize, end: usize) -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[check(ghost)]
 #[erasure(private core::slice::index::slice_index_fail)]
 #[requires(false)]
 const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
@@ -134,6 +140,7 @@ const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[check(ghost)]
 #[requires(false)]
 const fn slice_start_index_overflow_fail() -> ! {
     panic!("attempted to index slice from after maximum usize");
@@ -142,6 +149,7 @@ const fn slice_start_index_overflow_fail() -> ! {
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
+#[check(ghost)]
 #[requires(false)]
 const fn slice_end_index_overflow_fail() -> ! {
     panic!("attempted to index slice up to maximum usize");
@@ -1191,7 +1199,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 */
 #[must_use]
 // #[erasure(private core::slice::index::range)]
-#[requires(false)]
+#[requires(int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end) && int_upper_bound(range.end_bound_logic(), bounds.end) <= bounds.end@)]
+#[ensures(result.start@ == int_lower_bound(range.start_bound_logic()))]
+#[ensures(result.end@ == int_upper_bound(range.end_bound_logic(), bounds.end))]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
     R: RangeBounds<usize>,
@@ -1223,6 +1233,31 @@ where
 
     ops::Range { start, end }
 }
+
+/// Convert a lower bound to an inclusive lower bound, with a minimum of `0`.
+#[logic(open)]
+pub fn int_lower_bound(lo: Bound<&usize>) -> Int {
+    pearlite! {
+        match lo {
+            Bound::Included(lo) => lo@,
+            Bound::Excluded(lo) => lo@ + 1,
+            Bound::Unbounded => 0,
+        }
+    }
+}
+
+/// Convert an upper bound to an exclusive upper bound, with a maximum of `len`.
+#[logic(open)]
+pub fn int_upper_bound(hi: Bound<&usize>, len: usize) -> Int {
+    pearlite! {
+        match hi {
+            Bound::Included(hi) => hi@ + 1,
+            Bound::Excluded(hi) => hi@,
+            Bound::Unbounded => len@,
+        }
+    }
+}
+
 
 /*
 /// Performs bounds checking of a range without panicking.
