@@ -688,12 +688,18 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
-        if let Some(new_len) = usize::checked_sub(self.end, self.start) && self.end <= slice.len() {
+        if let Some(new_len) = usize::checked_sub(self.end, self.start)
+            && self.end <= slice.len()
+        {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, own) = PtrOwn::from_mut(slice);
-                let ptr =
-                    get_offset_len_mut_noubcheck(ptr as *mut [T], self.start, new_len, ghost! { *own });
+                let ptr = get_offset_len_mut_noubcheck(
+                    ptr as *mut [T],
+                    self.start,
+                    new_len,
+                    ghost! { *own },
+                );
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 PtrOwn::as_mut(ptr, own)
             }
@@ -751,7 +757,11 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(self, slice: *const [T], own: Ghost<&PtrOwn<[T]>>) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
         unsafe { ops::Range::from(self).get_unchecked_own(slice, own) }
     }
@@ -764,7 +774,11 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
-    unsafe fn get_unchecked_mut_own(self, slice: *mut [T], own: Ghost<&mut PtrOwn<[T]>>) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
         unsafe { ops::Range::from(self).get_unchecked_mut_own(slice, own) }
     }
@@ -1189,7 +1203,6 @@ pub fn int_upper_bound(hi: Bound<&usize>, len: usize) -> Int {
         }
     }
 }
-
 
 /*
 /// Performs bounds checking of a range without panicking.

@@ -13,14 +13,15 @@
     const_eval_select,
     slice_swap_unchecked,
     slice_index_methods,
-    rustc_allow_const_fn_unstable
+    rustc_allow_const_fn_unstable,
+    get_disjoint_mut_helpers
 )]
 pub mod intrinsics;
 pub mod ops;
+pub mod panic;
 pub mod ptr;
 pub mod slice;
 pub mod ub_checks;
-pub mod panic;
 
 // For `ub_checks::assert_unsafe_precondition`
 extern crate self as verif_slice;
