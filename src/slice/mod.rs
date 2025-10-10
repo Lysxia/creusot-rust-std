@@ -196,7 +196,7 @@ pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
     0 <= i && i < result@.len() && 0 <= j && j < N@
     ==> result@[i]@[j] == self_@[i * N@ + j]
 )]
-#[ensures(result@.len() == (^result)@.len())]
+#[ensures(self_@.len() == (^self_)@.len())]
 #[ensures(forall<i: Int, j: Int>
     0 <= i && i < result@.len() && 0 <= j && j < N@
     ==> (^result)@[i]@[j] == (^self_)@[i * N@ + j]

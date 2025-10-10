@@ -18,5 +18,6 @@ TARGETS="\
   get_mut \
   index \
   index_mut \
-  as_chunks_unchecked"
+  as_chunks_unchecked \
+  as_chunks_unchecked_mut"
 cargo creusot prove $TARGETS
