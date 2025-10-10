@@ -1,6 +1,6 @@
 //! Indexing implementations for `[T]`.
 
-// use core::panic::const_panic;
+use crate::panic::const_panic;
 // use core::ub_checks::assert_unsafe_precondition;
 // use core::{ops, range};
 use crate::assert_unsafe_precondition;
@@ -100,42 +100,41 @@ const fn slice_index_order_fail(index: usize, end: usize) -> ! {
 #[erasure(private core::slice::index::slice_index_fail)]
 #[requires(false)]
 const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
-    todo!()
-    // if start > len {
-    //     const_panic!(
-    //         "slice start index is out of range for slice",
-    //         "range start index {start} out of range for slice of length {len}",
-    //         start: usize,
-    //         len: usize,
-    //     )
-    // }
+    if start > len {
+        const_panic!(
+            "slice start index is out of range for slice",
+            "range start index {start} out of range for slice of length {len}",
+            start: usize,
+            len: usize,
+        )
+    }
 
-    // if end > len {
-    //     const_panic!(
-    //         "slice end index is out of range for slice",
-    //         "range end index {end} out of range for slice of length {len}",
-    //         end: usize,
-    //         len: usize,
-    //     )
-    // }
+    if end > len {
+        const_panic!(
+            "slice end index is out of range for slice",
+            "range end index {end} out of range for slice of length {len}",
+            end: usize,
+            len: usize,
+        )
+    }
 
-    // if start > end {
-    //     const_panic!(
-    //         "slice index start is larger than end",
-    //         "slice index starts at {start} but ends at {end}",
-    //         start: usize,
-    //         end: usize,
-    //     )
-    // }
+    if start > end {
+        const_panic!(
+            "slice index start is larger than end",
+            "slice index starts at {start} but ends at {end}",
+            start: usize,
+            end: usize,
+        )
+    }
 
-    // // Only reachable if the range was a `RangeInclusive` or a
-    // // `RangeToInclusive`, with `end == len`.
-    // const_panic!(
-    //     "slice end index is out of range for slice",
-    //     "range end index {end} out of range for slice of length {len}",
-    //     end: usize,
-    //     len: usize,
-    // )
+    // Only reachable if the range was a `RangeInclusive` or a
+    // `RangeToInclusive`, with `end == len`.
+    const_panic!(
+        "slice end index is out of range for slice",
+        "range end index {end} out of range for slice of length {len}",
+        end: usize,
+        len: usize,
+    )
 }
 // #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 // #[cfg_attr(feature = "panic_immediate_abort", inline)]

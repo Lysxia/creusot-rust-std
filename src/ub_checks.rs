@@ -65,6 +65,7 @@ pub(crate) const fn maybe_is_aligned_and_not_null(
     maybe_is_aligned(ptr, align) && (is_zst || !ptr.is_null())
 }
 
+#[trusted] // TODO: const_eval_select
 #[erasure(private core::ub_checks::maybe_is_aligned)]
 #[ensures(ptr.is_aligned_to_logic(align) ==> result)]
 pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {

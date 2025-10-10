@@ -1,7 +1,8 @@
-#![feature(new_range_api)]
-#![feature(sized_type_properties)]
-#![feature(portable_simd)]
+#![allow(internal_features)]
 #![feature(
+    new_range_api,
+    sized_type_properties,
+    portable_simd,
     slice_ptr_get,
     ub_checks,
     fmt_internals,
@@ -11,13 +12,15 @@
     decl_macro,
     const_eval_select,
     slice_swap_unchecked,
-    slice_index_methods
+    slice_index_methods,
+    rustc_allow_const_fn_unstable
 )]
 pub mod intrinsics;
 pub mod ops;
 pub mod ptr;
 pub mod slice;
 pub mod ub_checks;
+pub mod panic;
 
 // For `ub_checks::assert_unsafe_precondition`
 extern crate self as verif_slice;
