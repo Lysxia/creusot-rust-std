@@ -2,8 +2,13 @@
 pub use ::core::intrinsics::const_eval_select;
 use creusot_contracts::{ghost::PtrOwn, *};
 
-pub const unsafe fn exact_div<T: Copy>(x: T, y: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::exact_div)]
+#[requires(0 < y@ && x@ % y@ == 0)]
+#[ensures(result@ == x@ / y@)]
+pub const unsafe fn exact_div(x: usize, y: usize) -> usize {
+    unsafe { ::core::intrinsics::exact_div(x, y) }
 }
 
 pub const unsafe fn cttz_nonzero<T: Copy>(x: T) -> u32 {

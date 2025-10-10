@@ -316,3 +316,32 @@ impl<'a, T> DisjointOrEqual<'a, T> {
         }
     }
 }
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
+#[requires(0 < N@)]
+#[requires(own.len() % N@ == 0)]
+#[ensures(result.ptr() as *const T == own.ptr() as *const T)]
+#[ensures(result.len() == own.len() / N@)]
+#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
+    ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
+pub fn cast_array_own<const N: usize, T>(own: &PtrOwn<[T]>) -> &PtrOwn<[[T; N]]> {
+    unreachable!("ghost code")
+}
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
+#[requires(0 < N@)]
+#[requires(own.len() % N@ == 0)]
+#[ensures(result.ptr() as *const T == own.ptr() as *const T)]
+#[ensures(result.len() == own.len() / N@)]
+#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
+    ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
+#[ensures(own.ptr() == (^own).ptr())]
+#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
+    ==> (^result).val()@[i]@[j] == (^own).val()@[i * N@ + j])]
+pub fn cast_array_own_mut<const N: usize, T>(own: &mut PtrOwn<[T]>) -> &mut PtrOwn<[[T; N]]> {
+    unreachable!("ghost code")
+}

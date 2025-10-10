@@ -166,36 +166,55 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
     }
 }
 
-#[trusted]
-#[requires(false)]
+#[erasure(<[T]>::as_chunks_unchecked::<N>)]
+#[requires(N@ != 0 && self_@.len() % N@ == 0)]
+#[ensures(result@.len() == self_@.len() / N@)]
+#[ensures(forall<i: Int, j: Int>
+    0 <= i && i < result@.len() && 0 <= j && j < N@
+    ==> result@[i]@[j] == self_@[i * N@ + j]
+)]
 pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
     assert_unsafe_precondition!(
         check_language_ub,
         "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
         pearlite! { n@ != 0 && len@ % n@ == 0 },
-        (n: usize = N, len: usize = self_.len()) => n != 0 && len % n == 0,
+        (n: usize = N, len: usize = self_.len()) => n != 0 && len.is_multiple_of(n),
     );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
+    let (ptr, own) = self_.as_ptr_own();
+    let own = ghost! { crate::ptr::cast_array_own(own.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
-    unsafe { from_raw_parts(self_.as_ptr().cast(), new_len) }
+    unsafe { from_raw_parts_own(ptr.cast(), new_len, own) }
 }
 
-#[trusted]
-#[requires(false)]
+#[erasure(<[T]>::as_chunks_unchecked_mut::<N>)]
+#[requires(N@ != 0 && self_@.len() % N@ == 0)]
+#[ensures(result@.len() == self_@.len() / N@)]
+#[ensures(forall<i: Int, j: Int>
+    0 <= i && i < result@.len() && 0 <= j && j < N@
+    ==> result@[i]@[j] == self_@[i * N@ + j]
+)]
+#[ensures(result@.len() == (^result)@.len())]
+#[ensures(forall<i: Int, j: Int>
+    0 <= i && i < result@.len() && 0 <= j && j < N@
+    ==> (^result)@[i]@[j] == (^self_)@[i * N@ + j]
+)]
 pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mut [[T; N]] {
     assert_unsafe_precondition!(
         check_language_ub,
         "slice::as_chunks_unchecked requires `N != 0` and the slice to split exactly into `N`-element chunks",
         pearlite! { n@ != 0 && len@ % n@ == 0 },
-        (n: usize = N, len: usize = self_.len()) => n != 0 && len % n == 0
+        (n: usize = N, len: usize = self_.len()) => n != 0 && len.is_multiple_of(n)
     );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
+    let (ptr, own) = self_.as_mut_ptr_own();
+    let own = ghost! { crate::ptr::cast_array_own_mut(own.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
-    unsafe { from_raw_parts_mut(self_.as_mut_ptr().cast(), new_len) }
+    unsafe { from_raw_parts_mut_own((ptr as *mut T).cast(), new_len, own) }
 }
 
 #[erasure(<[T]>::split_at_unchecked)]
