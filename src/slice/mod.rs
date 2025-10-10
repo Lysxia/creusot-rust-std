@@ -217,6 +217,31 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
     unsafe { from_raw_parts_mut_own((ptr as *mut T).cast(), new_len, own) }
 }
 
+#[erasure(<[T]>::split_at)]
+#[requires(mid@ <= self_@.len())]
+#[ensures(self_@.subsequence(0, mid@) == result.0@)]
+#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+pub fn split_at<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
+    match split_at_checked(self_, mid) {
+        Some(pair) => pair,
+        None => panic!("mid > len"),
+    }
+}
+
+#[erasure(<[T]>::split_at_mut)]
+#[requires(mid@ <= self_@.len())]
+#[ensures(self_@.subsequence(0, mid@) == result.0@)]
+#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@.len() == (^self_)@.len())]
+#[ensures((^self_)@.subsequence(0, mid@) == (^result.0)@)]
+#[ensures((^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@)]
+pub fn split_at_mut<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
+    match split_at_mut_checked(self_, mid) {
+        Some(pair) => pair,
+        None => panic!("mid > len"),
+    }
+}
+
 #[erasure(<[T]>::split_at_unchecked)]
 #[requires(mid@ <= self_@.len())]
 #[ensures(self_@.subsequence(0, mid@) == result.0@)]
@@ -251,6 +276,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 #[requires(mid@ <= self_@.len())]
 #[ensures(self_@.subsequence(0, mid@) == result.0@)]
 #[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@.len() == (^self_)@.len())]
 #[ensures((^self_)@.subsequence(0, mid@) == (^result.0)@)]
 #[ensures((^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@)]
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
@@ -564,51 +590,83 @@ pub fn reverse<T>(self_: &mut [T]) {
     }
 }
 
-#[trusted]
-#[requires(false)]
+#[erasure(<[T]>::as_chunks::<N>)]
+#[requires(N@ != 0)]
+#[ensures(result.0@.len() == self_@.len() / N@)]
+#[ensures(result.1@.len() == self_@.len() % N@)]
+#[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+    ==> result.0@[i]@[j] == self_@[i * N@ + j])]
+#[ensures(forall<i> 0 <= i && i < self_@.len() % N@
+    ==> result.1@[i] == self_@[self_@.len() / N@ * N@ + i])]
 /* pub const */
 pub fn as_chunks<T, const N: usize>(self_: &[T]) -> (&[[T; N]], &[T]) {
     assert!(N != 0, "chunk size must be non-zero");
     let len_rounded_down = self_.len() / N * N;
     // SAFETY: The rounded-down value is always the same or smaller than the
     // original length, and thus must be in-bounds of the slice.
-    let (multiple_of_n, remainder) = unsafe { self_.split_at_unchecked(len_rounded_down) };
+    let (multiple_of_n, remainder) = unsafe { split_at_unchecked(self_, len_rounded_down) };
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
-    let array_slice = unsafe { multiple_of_n.as_chunks_unchecked() };
+    let array_slice = unsafe { as_chunks_unchecked(multiple_of_n) };
+    proof_assert! { forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+        ==> i * N@ + j <= (self_@.len() / N@ - 1) * N@ + N@ };
     (array_slice, remainder)
 }
 
-#[trusted]
-#[requires(false)]
+#[requires(N@ != 0)]
+#[ensures(result.0@.len() == self_@.len() % N@)]
+#[ensures(result.1@.len() == self_@.len() / N@)]
+#[ensures(forall<i> 0 <= i && i < self_@.len() % N@
+    ==> result.0@[i] == self_@[i])]
+#[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+    ==> result.1@[i]@[j] == self_@[self_@.len() % N@ + i * N@ + j])]
 /* pub const */
 pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
     assert!(N != 0, "chunk size must be non-zero");
     let len = self_.len() / N;
-    let (remainder, multiple_of_n) = self_.split_at(self_.len() - len * N);
+    let (remainder, multiple_of_n) = split_at(self_, self_.len() - len * N);
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
-    let array_slice = unsafe { multiple_of_n.as_chunks_unchecked() };
+    let array_slice = unsafe { as_chunks_unchecked(multiple_of_n) };
     (remainder, array_slice)
 }
 
-#[trusted]
-#[requires(false)]
+#[erasure(<[T]>::as_chunks_mut::<N>)]
+#[requires(N@ != 0)]
+#[ensures(result.0@.len() == self_@.len() / N@)]
+#[ensures(result.1@.len() == self_@.len() % N@)]
+#[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+    ==> result.0@[i]@[j] == self_@[i * N@ + j])]
+#[ensures(forall<i> 0 <= i && i < self_@.len() % N@
+    ==> result.1@[i] == self_@[self_@.len() / N@ * N@ + i])]
+#[ensures(self_@.len() == (^self_)@.len())]
+#[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+    ==> (^result.0)@[i]@[j] == (^self_)@[i * N@ + j])]
+#[ensures(forall<i> 0 <= i && i < self_@.len() % N@
+    ==> (^result.1)@[i] == (^self_)@[self_@.len() / N@ * N@ + i])]
 /* pub const */
 pub fn as_chunks_mut<T, const N: usize>(self_: &mut [T]) -> (&mut [[T; N]], &mut [T]) {
     assert!(N != 0, "chunk size must be non-zero");
     let len_rounded_down = self_.len() / N * N;
+    proof_assert! { forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
+        ==> i * N@ + j <= (self_@.len() / N@ - 1) * N@ + N@ };
     // SAFETY: The rounded-down value is always the same or smaller than the
     // original length, and thus must be in-bounds of the slice.
-    let (multiple_of_n, remainder) = unsafe { self_.split_at_mut_unchecked(len_rounded_down) };
+    let (multiple_of_n, remainder) = unsafe { split_at_mut_unchecked(self_, len_rounded_down) };
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
-    let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_mut() };
+    let array_slice = unsafe { as_chunks_unchecked_mut(multiple_of_n) };
     (array_slice, remainder)
 }
 
 /* pub const */
 #[erasure(<[T]>::split_at_checked)]
+#[ensures(match result {
+    None => mid@ > self_@.len(),
+    Some(result) => mid@ <= self_@.len()
+        && self_@.subsequence(0, mid@) == result.0@
+        && self_@.subsequence(mid@, self_@.len()) == result.1@
+})]
 pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
     if mid <= self_.len() {
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self_`, which
@@ -621,6 +679,15 @@ pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
 
 /* pub const */
 #[erasure(<[T]>::split_at_mut_checked)]
+#[ensures(match result {
+    None => mid@ > self_@.len(),
+    Some(result) => mid@ <= self_@.len()
+        && self_@.subsequence(0, mid@) == result.0@
+        && self_@.subsequence(mid@, self_@.len()) == result.1@
+        && self_@.len() == (^self_)@.len()
+        && (^self_)@.subsequence(0, mid@) == (^result.0)@
+        && (^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@
+})]
 pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T], &mut [T])> {
     if mid <= self_.len() {
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self_`, which

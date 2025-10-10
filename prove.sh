@@ -1,7 +1,11 @@
 TARGETS="\
   block_get_2_ghost \
+  split_at \
+  split_at_mut \
   split_at_unchecked \
   split_at_mut_unchecked \
+  split_at_checked \
+  split_at_mut_checked \
   swap_unchecked \
   get_unchecked \
   get_unchecked_mut \
@@ -18,6 +22,8 @@ TARGETS="\
   get_mut \
   index \
   index_mut \
+  as_chunks \
+  as_chunks_mut \
   as_chunks_unchecked \
   as_chunks_unchecked_mut"
 cargo creusot prove $TARGETS
