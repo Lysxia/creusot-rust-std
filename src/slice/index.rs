@@ -1132,7 +1132,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 // #[unstable(feature = "slice_range", issue = "76393")]
 */
 #[must_use]
-// #[erasure(private core::slice::index::range)]
+#[erasure(private core::slice::index::range)]
 #[requires(int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end) && int_upper_bound(range.end_bound_logic(), bounds.end) <= bounds.end@)]
 #[ensures(result.start@ == int_lower_bound(range.start_bound_logic()))]
 #[ensures(result.end@ == int_upper_bound(range.end_bound_logic(), bounds.end))]
