@@ -615,6 +615,7 @@ pub fn as_chunks<T, const N: usize>(self_: &[T]) -> (&[[T; N]], &[T]) {
     (array_slice, remainder)
 }
 
+#[erasure(<[T]>::as_rchunks::<N>)]
 #[requires(N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() % N@)]
 #[ensures(result.1@.len() == self_@.len() / N@)]
