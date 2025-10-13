@@ -22,6 +22,7 @@ TARGETS="\
   get_mut \
   index \
   index_mut \
+  as_rchunks \
   as_chunks \
   as_chunks_mut \
   as_chunks_unchecked \
