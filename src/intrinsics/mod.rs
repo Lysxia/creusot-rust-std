@@ -53,24 +53,6 @@ pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
 }
 
 #[trusted]
-#[erasure(core::intrinsics::offset)]
-#[requires(own.ptr() as *const T == dst)]
-#[requires(offset@ <= own.len())]
-#[ensures((own.ptr() as *const T).offset_logic(offset@) == result)]
-pub unsafe fn offset_own<T>(dst: *const T, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> *const T {
-    unsafe { core::intrinsics::offset(dst, offset) }
-}
-
-#[trusted]
-#[erasure(core::intrinsics::offset)]
-#[requires(own.ptr() as *const T == dst as *const T)]
-#[requires(offset@ <= own.len())]
-#[ensures((own.ptr() as *const T).offset_logic(offset@) == result as *const T)]
-pub unsafe fn offset_own_mut<T>(dst: *mut T, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> *mut T {
-    unsafe { core::intrinsics::offset(dst, offset) }
-}
-
-#[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<&T, &[T], T>)]
 #[requires(index@ < slice@.len())]
 #[ensures(*result == slice@[index@])]

@@ -1,4 +1,5 @@
 TARGETS="\
+  add_own \
   block_get_2_ghost \
   split_at \
   split_at_mut \

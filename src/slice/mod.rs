@@ -14,7 +14,10 @@ use creusot_contracts::{Clone, PartialEq, std::ops::RangeBounds, *};
 // use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeInclusive};
 // use core::panic::const_panic;
-use crate::{assert_unsafe_precondition, ptr as vptr};
+use crate::{
+    assert_unsafe_precondition,
+    ptr::{self as vptr, PtrAddExt as _},
+};
 use core::simd::{self, Simd};
 use core::{hint /* range, */, ptr};
 

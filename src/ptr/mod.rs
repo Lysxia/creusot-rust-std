@@ -3,6 +3,28 @@ use core::hint::assert_unchecked as assume;
 use creusot_contracts::ghost::PtrOwn;
 use creusot_contracts::*;
 
+mod const_ptr;
+mod mut_ptr;
+
+pub trait PtrAddExt<T> {
+    /// Restriction of `add` that requires evidence that the addition is safe.
+    /// We simply require a borrow of the `PtrOwn<[T]>` token for the result pointer.
+    /// In particular, this accounts for one-past-the-end pointers, which point to a zero-sized slice.
+    ///
+    /// From https://doc.rust-lang.org/std/primitive.pointer.html#method.add:
+    ///
+    /// > If any of the following conditions are violated, the result is Undefined Behavior:
+    /// > - The offset in bytes, `count * size_of::<T>()`, computed on mathematical
+    /// >   integers (without “wrapping around”), must fit in an `isize`.
+    /// > - If the computed offset is non-zero, then `self` must be derived from a
+    /// >   pointer to some allocated object, and the entire memory range between
+    /// >   `self` and the result must be in bounds of that allocated object.
+    /// >   In particular, this range must not “wrap around” the edge of the address space.
+    ///
+    #[requires(false)]
+    unsafe fn add_own(self, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> Self;
+}
+
 /// Align pointer `p`.
 ///
 /// Calculate offset (in terms of elements of `size_of::<T>()` stride) that has to be applied

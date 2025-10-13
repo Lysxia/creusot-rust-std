@@ -108,7 +108,7 @@ unsafe fn get_offset_len_noubcheck<T>(
 ) -> *const [T] {
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { crate::intrinsics::offset_own(ptr, offset, own) };
+    let ptr = unsafe { std::intrinsics::add_own(ptr, offset, own) };
     aggregate_raw_ptr_slice(ptr, len)
 }
 
@@ -126,7 +126,7 @@ unsafe fn get_offset_len_mut_noubcheck<T>(
 ) -> *mut [T] {
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { crate::intrinsics::offset_own_mut(ptr, offset, own) };
+    let ptr = unsafe { std::intrinsics::add_own_mut(ptr, offset, own) };
     aggregate_raw_ptr_mut_slice(ptr, len)
 }
 
