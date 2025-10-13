@@ -121,7 +121,7 @@ where
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
     unsafe {
-        let (ptr, own) = index.get_unchecked_mut_own(ptr as *mut [T], owns);
+        let (ptr, own) = index.get_unchecked_mut_own(ptr, owns);
         PtrOwn::as_mut(ptr, own)
     }
 }

@@ -578,12 +578,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_mut(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let ptr = get_offset_len_mut_noubcheck(
-                    ptr as *mut [T],
-                    self.start,
-                    new_len,
-                    ghost! { *own },
-                );
+                let ptr = get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { *own });
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 Some(PtrOwn::as_mut(ptr, own))
             }
@@ -694,12 +689,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, own) = PtrOwn::from_mut(slice);
-                let ptr = get_offset_len_mut_noubcheck(
-                    ptr as *mut [T],
-                    self.start,
-                    new_len,
-                    ghost! { *own },
-                );
+                let ptr = get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { *own });
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 PtrOwn::as_mut(ptr, own)
             }
