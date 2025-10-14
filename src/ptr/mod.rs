@@ -1,6 +1,6 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
-use creusot_contracts::ghost::PtrOwn;
+use creusot_contracts::ghost::{PtrLive, PtrOwn};
 use creusot_contracts::*;
 
 mod const_ptr;
@@ -22,7 +22,7 @@ pub trait PtrAddExt<T> {
     /// >   In particular, this range must not “wrap around” the edge of the address space.
     ///
     #[requires(false)]
-    unsafe fn add_own(self, offset: usize, own: Ghost<&PtrOwn<[T]>>) -> Self;
+    unsafe fn add_own(self, offset: usize, own: Ghost<&PtrLive<T>>) -> Self;
 }
 
 /// Align pointer `p`.

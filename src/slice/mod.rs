@@ -146,7 +146,8 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
         ) => a < len && b < len,
     );
 
-    let (ptr, mut owns) = self_.as_mut_ptr_own();
+    let (ptr, owns) = self_.as_mut_ptr_own();
+    let (mut owns, live) = ghost! { owns.into_inner().live_mut() }.split();
     let own = ghost! {
         if a == b {
             let a_ = Int::new(a as i128).into_inner();
@@ -161,11 +162,7 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
 
     // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
     unsafe {
-        vptr::swap_disjoint(
-            (ptr as *mut T).add_own(a, ghost!(own.left_ghost().as_slice_own_ref_ghost())),
-            (ptr as *mut T).add_own(b, ghost!(own.right_ghost().as_slice_own_ref_ghost())),
-            own,
-        );
+        vptr::swap_disjoint(ptr.add_own(a, live), ptr.add_own(b, live), own);
     }
 }
 
@@ -269,7 +266,11 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     unsafe {
         (
             from_raw_parts_own(ptr, mid, owns0),
-            from_raw_parts_own(ptr.add_own(mid, owns1), unchecked_sub(len, mid), owns1),
+            from_raw_parts_own(
+                ptr.add_own(mid, ghost! { owns0.live() }),
+                unchecked_sub(len, mid),
+                owns1,
+            ),
         )
     }
 }
@@ -285,6 +286,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
     let (ptr, owns) = self_.as_mut_ptr_own();
+    let (owns, live) = ghost! { owns.into_inner().live_mut() }.split();
     let (owns0, owns1) = ghost! {
         owns.into_inner().split_at_mut_ghost(*Int::new(mid as i128))
     }
@@ -303,12 +305,8 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     // is fine.
     unsafe {
         (
-            from_raw_parts_mut_own(ptr as *mut T, mid, owns0),
-            from_raw_parts_mut_own(
-                (ptr as *mut T).add_own(mid, ghost!(*owns1)) as *mut T,
-                unchecked_sub(len, mid),
-                owns1,
-            ),
+            from_raw_parts_mut_own(ptr, mid, owns0),
+            from_raw_parts_mut_own(ptr.add_own(mid, live), unchecked_sub(len, mid), owns1),
         )
     }
 }

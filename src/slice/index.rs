@@ -13,7 +13,11 @@ use crate::ops;
 use core::ops::Bound;
 #[cfg(creusot)]
 use creusot_contracts::std::ptr::metadata_logic;
-use creusot_contracts::{ghost::PtrOwn, std::ops::RangeBounds, *};
+use creusot_contracts::{
+    ghost::{PtrLive, PtrOwn},
+    std::ops::RangeBounds,
+    *,
+};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -96,37 +100,37 @@ const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_noubcheck)]
-#[requires(own.ptr() == ptr)]
-#[requires(offset@ + len@ <= own.len())]
+#[requires(live.contains(ptr as *const T))]
+#[requires(live.contains((ptr as *const T).offset_logic(offset@ + len@)))]
 #[ensures(result as *const T == (ptr as *const T).offset_logic(offset@))]
 #[ensures(result.len_logic() == len@)]
 unsafe fn get_offset_len_noubcheck<T>(
     ptr: *const [T],
     offset: usize,
     len: usize,
-    own: Ghost<&PtrOwn<[T]>>,
+    live: Ghost<&PtrLive<T>>,
 ) -> *const [T] {
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { std::intrinsics::add_own(ptr, offset, own) };
+    let ptr = unsafe { std::intrinsics::add_own(ptr, offset, live) };
     aggregate_raw_ptr_slice(ptr, len)
 }
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_mut_noubcheck)]
-#[requires(own.ptr() == ptr as *const [T])]
-#[requires(offset@ + len@ <= own.len())]
+#[requires(live.contains(ptr as *const T))]
+#[requires(live.contains((ptr as *const T).offset_logic(offset@ + len@)))]
 #[ensures(result as *const T == (ptr as *const T).offset_logic(offset@))]
 #[ensures(result.len_logic() == len@)]
 unsafe fn get_offset_len_mut_noubcheck<T>(
     ptr: *mut [T],
     offset: usize,
     len: usize,
-    own: Ghost<&PtrOwn<[T]>>,
+    live: Ghost<&PtrLive<T>>,
 ) -> *mut [T] {
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { std::intrinsics::add_own_mut(ptr, offset, own) };
+    let ptr = unsafe { std::intrinsics::add_own_mut(ptr, offset, live) };
     aggregate_raw_ptr_mut_slice(ptr, len)
 }
 
@@ -556,7 +560,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_ref(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
                 let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
                 Some(PtrOwn::as_ref(ptr, own))
             }
@@ -578,7 +582,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, own) = PtrOwn::from_mut(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let ptr = get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let ptr =
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 Some(PtrOwn::as_mut(ptr, own))
             }
@@ -617,7 +622,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // Using the intrinsic avoids a superfluous UB check,
             // since the one on this method already checked `end >= start`.
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
-            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { *own });
+            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { own.live() });
             let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
             (ptr, own)
         }
@@ -649,7 +654,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         // SAFETY: see comments for `get_unchecked` above.
         unsafe {
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
-            let ptr = get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { *own });
+            let ptr =
+                get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { own.live() });
             let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
             (ptr, own)
         }
@@ -667,7 +673,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, own) = PtrOwn::from_ref(slice);
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
                 let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
                 PtrOwn::as_ref(ptr, own)
             }
@@ -689,7 +695,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, own) = PtrOwn::from_mut(slice);
-                let ptr = get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { *own });
+                let ptr =
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 PtrOwn::as_mut(ptr, own)
             }

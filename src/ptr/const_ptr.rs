@@ -1,14 +1,14 @@
 use super::PtrAddExt;
 use crate::intrinsics::const_eval_select;
 use crate::ub_checks;
-use creusot_contracts::{ghost::PtrOwn, *};
+use creusot_contracts::{ghost::PtrLive, *};
 
 impl<T> PtrAddExt<T> for *const T {
-    #[requires(self == own.ptr() as *const T)]
-    #[requires(count@ <= own.len())]
-    #[ensures(result == (own.ptr() as *const T).offset_logic(count@))]
+    #[requires(live.contains(self))]
+    #[requires(live.contains(self.offset_logic(count@)))]
+    #[ensures(result == self.offset_logic(count@))]
     #[erasure(<*const T>::add)]
-    unsafe fn add_own(self, count: usize, own: Ghost<&PtrOwn<[T]>>) -> Self {
+    unsafe fn add_own(self, count: usize, live: Ghost<&PtrLive<T>>) -> Self {
         #[trusted]
         // #[cfg(debug_assertions)]
         // #[inline]
@@ -42,6 +42,6 @@ impl<T> PtrAddExt<T> for *const T {
         );
 
         // SAFETY: the caller must uphold the safety contract for `offset`.
-        unsafe { std::intrinsics::add_own(self, count, own) }
+        unsafe { std::intrinsics::add_own(self, count, live) }
     }
 }

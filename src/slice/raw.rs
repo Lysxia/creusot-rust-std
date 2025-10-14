@@ -12,7 +12,7 @@ pub unsafe fn from_raw_parts_own<'a, T>(
     own: Ghost<&'a PtrOwn<[T]>>,
 ) -> &'a [T] {
     ghost! {
-        own.ptr_is_aligned_lemma();
+        own.live();
         div_mono_lemma();
     };
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
@@ -46,7 +46,7 @@ pub unsafe fn from_raw_parts_mut_own<T>(
     own: Ghost<&mut PtrOwn<[T]>>,
 ) -> &mut [T] {
     ghost! {
-        own.ptr_is_aligned_lemma();
+        own.live();
         div_mono_lemma();
     };
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
