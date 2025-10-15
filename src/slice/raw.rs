@@ -2,7 +2,7 @@ use crate::ub_checks;
 use ::std::ptr;
 use creusot_contracts::{ghost::PtrOwn, *};
 
-#[requires(own.ptr().as_ptr_logic() == data)]
+#[requires(own.ptr().thin() == data)]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
 #[erasure(::std::slice::from_raw_parts)]
@@ -34,11 +34,11 @@ pub unsafe fn from_raw_parts_own<'a, T>(
     }
 }
 
-#[requires(own.ptr().as_ptr_logic() == data as *const T)]
+#[requires(own.ptr().thin() == data as *const T)]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
-#[ensures((^own.inner_logic()).ptr().as_ptr_logic() == data as *const T)]
-#[ensures((^result)@ == (^own.inner_logic()).val()@)]
+#[ensures((^*own).ptr().thin() == data as *const T)]
+#[ensures((^result)@ == (^*own).val()@)]
 #[erasure(::std::slice::from_raw_parts_mut)]
 pub unsafe fn from_raw_parts_mut_own<T>(
     data: *mut T,

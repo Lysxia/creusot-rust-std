@@ -62,14 +62,14 @@ use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_p
 
 #[check(ghost)]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
-#[ensures(result.0.ptr() == s.ptr().as_ptr_logic().offset_logic(i))]
-#[ensures(result.1.ptr() == s.ptr().as_ptr_logic().offset_logic(j))]
+#[ensures(result.0.ptr() == (s.ptr() as *const T).offset_logic(i))]
+#[ensures(result.1.ptr() == (s.ptr() as *const T).offset_logic(j))]
 #[ensures(*result.0.val() == s.val()@[i])]
 #[ensures(*result.1.val() == s.val()@[j])]
-#[ensures(*(^result.inner_logic().0).val() == (^s.inner_logic()).val()@[i])]
-#[ensures(*(^result.inner_logic().1).val() == (^s.inner_logic()).val()@[j])]
-#[ensures((^s.inner_logic()).ptr() == s.ptr())]
-#[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^s.inner_logic()).val()@[k] == s.val()@[k])]
+#[ensures(*(^(*result).0).val() == (^*s).val()@[i])]
+#[ensures(*(^(*result).1).val() == (^*s).val()@[j])]
+#[ensures((^*s).ptr() == s.ptr())]
+#[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^*s).val()@[k] == s.val()@[k])]
 pub fn block_get_2_ghost<T>(
     s: Ghost<&mut PtrOwn<[T]>>,
     i: Int,

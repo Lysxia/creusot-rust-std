@@ -100,10 +100,10 @@ const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_noubcheck)]
-#[requires(live.contains(ptr as *const T))]
-#[requires(live.contains((ptr as *const T).offset_logic(offset@ + len@)))]
-#[ensures(result as *const T == (ptr as *const T).offset_logic(offset@))]
-#[ensures(result.len_logic() == len@)]
+#[requires(live.contains(ptr.thin()))]
+#[requires(live.contains(ptr.thin().offset_logic(offset@ + len@)))]
+#[ensures(result.thin() == ptr.thin().offset_logic(offset@))]
+#[ensures(result.len_logic() == len)]
 unsafe fn get_offset_len_noubcheck<T>(
     ptr: *const [T],
     offset: usize,
@@ -118,10 +118,10 @@ unsafe fn get_offset_len_noubcheck<T>(
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_mut_noubcheck)]
-#[requires(live.contains(ptr as *const T))]
-#[requires(live.contains((ptr as *const T).offset_logic(offset@ + len@)))]
-#[ensures(result as *const T == (ptr as *const T).offset_logic(offset@))]
-#[ensures(result.len_logic() == len@)]
+#[requires(live.contains(ptr.thin()))]
+#[requires(live.contains(ptr.thin().offset_logic(offset@ + len@)))]
+#[ensures(result.thin() == ptr.thin().offset_logic(offset@))]
+#[ensures(result.len_logic() == len)]
 unsafe fn get_offset_len_mut_noubcheck<T>(
     ptr: *mut [T],
     offset: usize,
