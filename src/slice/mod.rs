@@ -79,11 +79,15 @@ pub fn block_get_2_ghost<T>(
         if i < j {
             let (_, si) = s.into_inner().split_at_mut_ghost(i);
             let (si, sj) = si.split_at_mut_ghost(j - i);
-            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            let oi = si.elements_mut().pop_front_ghost().unwrap();
+            let oj = sj.elements_mut().pop_front_ghost().unwrap();
+            (oi, oj)
         } else {
             let (_, sj) = s.into_inner().split_at_mut_ghost(j);
             let (sj, si) = sj.split_at_mut_ghost(i - j);
-            (si.as_ptr_own_mut_ghost(), sj.as_ptr_own_mut_ghost())
+            let oi = si.elements_mut().pop_front_ghost().unwrap();
+            let oj = sj.elements_mut().pop_front_ghost().unwrap();
+            (oi, oj)
         }
     }
 }
