@@ -11,6 +11,7 @@ use crate::intrinsics::{
 use crate::ops;
 #[cfg(creusot)]
 use core::ops::Bound;
+use core::range;
 #[cfg(creusot)]
 use creusot_contracts::std::ptr::metadata_logic;
 use creusot_contracts::{
@@ -259,8 +260,8 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut T,
@@ -291,17 +292,17 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
 unsafe impl<T> SliceIndex<[T]> for usize {
     type Output = T;
 
-    #[logic]
+    #[logic(open, inline)]
     fn in_bounds(self, slice: [T]) -> bool {
         pearlite! { self@ < slice@.len() }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: T) -> bool {
         pearlite! { res == slice@[self@] }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
         pearlite! { forall<i: Int> i != self@ ==> old@.get(i) == fin@.get(i) }
     }
@@ -373,8 +374,8 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const T == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut [T],
@@ -528,17 +529,17 @@ fn ptr_own_slice_mut<T>(
 unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     type Output = [T];
 
-    #[logic]
+    #[logic(open, inline)]
     fn in_bounds(self, slice: [T]) -> bool {
         pearlite! { self.start <= self.end && self.end@ <= slice@.len() }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
         pearlite! { res@ == slice@.subsequence(self.start@, self.end@) }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
         pearlite! {
             old@.len() == fin@.len()
@@ -634,8 +635,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut [T],
@@ -710,17 +711,17 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     type Output = [T];
 
-    #[logic]
+    #[logic(open, inline)]
     fn in_bounds(self, slice: [T]) -> bool {
         pearlite! { self.start <= self.end && self.end@ <= slice@.len() }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
         pearlite! { res@ == slice@.subsequence(self.start@, self.end@) }
     }
 
-    #[logic]
+    #[logic(open, inline)]
     fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
         pearlite! {
             old@.len() == fin@.len()
@@ -769,8 +770,8 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     #[requires(self.in_bounds(*own.val()))]
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(self.slice_index(*(^own.inner_logic()).val(), *(^result.1.inner_logic()).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^own.inner_logic()).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
         slice: *mut [T],
@@ -799,40 +800,96 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     }
 }
 
-/*
 /// The methods `index` and `index_mut` panic if the end of the range is out of bounds.
 // #[stable(feature = "slice_get_slice_impls", since = "1.15.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for ops::RangeTo<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.end@ <= slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(0, self.end@) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> self.end@ <= i ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         (0..self.end).get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         (0..self.end).get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (0..self.end).get_unchecked(slice) }
+        unsafe { (0..self.end).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (0..self.end).get_unchecked_mut(slice) }
+        unsafe { (0..self.end).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline(always)]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         (0..self.end).index(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         (0..self.end).index_mut(slice)
     }
@@ -840,117 +897,293 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeTo<usize> {
 
 /// The methods `index` and `index_mut` panic if the start of the range is out of bounds.
 // #[stable(feature = "slice_get_slice_impls", since = "1.15.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.start@ <= slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(self.start@, slice@.len()) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < self.start@ ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         (self.start..slice.len()).get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         (self.start..slice.len()).get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (self.start..slice.len()).get_unchecked(slice) }
+        unsafe { (self.start..slice.len()).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (self.start..slice.len()).get_unchecked_mut(slice) }
+        unsafe { (self.start..slice.len()).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         if self.start > slice.len() {
             slice_index_fail(self.start, slice.len(), slice.len())
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe { &*self.get_unchecked(slice) }
+        unsafe {
+            let (slice, own) = PtrOwn::from_ref(slice);
+            let (ptr, own) = self.get_unchecked_own(slice, own);
+            PtrOwn::as_ref(ptr, own)
+        }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         if self.start > slice.len() {
             slice_index_fail(self.start, slice.len(), slice.len())
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
-        unsafe { &mut *self.get_unchecked_mut(slice) }
+        unsafe {
+            let (slice, own) = PtrOwn::from_mut(slice);
+            let (ptr, own) = self.get_unchecked_mut_own(slice, own);
+            PtrOwn::as_mut(ptr, own)
+        }
     }
 }
 
 // #[unstable(feature = "new_range_api", issue = "125687")]
-unsafe impl<T> SliceIndex<[T]> for range::RangeFrom<usize> {
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
+unsafe impl<T> SliceIndex<[T]> for core::range::RangeFrom<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.start@ <= slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(self.start@, slice@.len()) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < self.start@ ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         ops::RangeFrom::from(self).get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         ops::RangeFrom::from(self).get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { ops::RangeFrom::from(self).get_unchecked(slice) }
+        unsafe { ops::RangeFrom::from(self).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { ops::RangeFrom::from(self).get_unchecked_mut(slice) }
+        unsafe { ops::RangeFrom::from(self).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         ops::RangeFrom::from(self).index(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         ops::RangeFrom::from(self).index_mut(slice)
     }
 }
 
 // #[stable(feature = "slice_get_slice_impls", since = "1.15.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for ops::RangeFull {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, _slice: [T]) -> bool {
+        true
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@ }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, _old: [T], _fin: [T]) -> bool {
+        true
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         Some(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         Some(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
-        slice
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        (slice, own)
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
-        slice
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        (slice, own)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         slice
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         slice
     }
@@ -961,80 +1194,230 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFull {
 /// - the start of the range is greater than the end of the range or
 /// - the end of the range is out of bounds.
 // #[stable(feature = "inclusive_range", since = "1.26.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.start_log()@ <= self.end_log()@ && self.end_log()@ < slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(self.start_log()@, self.end_log()@ + 1) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < self.start_log()@ || self.end_log()@ < i ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
+    #[trusted]
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
-        if *self.end() == usize::MAX { None } else { self.into_slice_range().get(slice) }
+        todo!() // private function
+        // if *self.end() == usize::MAX { None } else { self.into_slice_range().get(slice) }
     }
 
+    #[trusted]
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
-        if *self.end() == usize::MAX { None } else { self.into_slice_range().get_mut(slice) }
+        todo!() // private function
+        // if *self.end() == usize::MAX { None } else { self.into_slice_range().get_mut(slice) }
     }
 
+    #[trusted]
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { self.into_slice_range().get_unchecked(slice) }
+        todo!() // private function
+        // unsafe { self.into_slice_range().get_unchecked_own(slice, own) }
     }
 
+    #[trusted]
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { self.into_slice_range().get_unchecked_mut(slice) }
+        todo!() // private function
+        // unsafe { self.into_slice_range().get_unchecked_mut_own(slice, own) }
     }
 
+    #[trusted] // TODO
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
-        if *self.end() == usize::MAX {
-            slice_end_index_overflow_fail();
-        }
-        self.into_slice_range().index(slice)
+        todo!() // private fields
+        // let Self { mut start, mut end, exhausted } = self;
+        // let len = slice.len();
+        // if end < len {
+        //     end = end + 1;
+        //     start = if exhausted { end } else { start };
+        //     if let Some(new_len) = usize::checked_sub(end, start) {
+        //         unsafe {
+        //             // SAFETY: `self` is checked to be valid and in bounds above.
+        //             let (ptr, own) = PtrOwn::from_ref(slice);
+        //             let ptr = get_offset_len_noubcheck(ptr, start, new_len, ghost! { own.live() });
+        //             let own = ghost! { ptr_own_slice(own, self.start, self.end + 1).into_inner() };
+        //             return PtrOwn::as_ref(ptr, own)
+        //         }
+        //     }
+        // }
+        // slice_index_fail(start, end, slice.len())
     }
 
+    #[trusted] // TODO
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
-        if *self.end() == usize::MAX {
-            slice_end_index_overflow_fail();
-        }
-        self.into_slice_range().index_mut(slice)
+        todo!() // private fields
+        // let Self { mut start, mut end, exhausted } = self;
+        // let len = slice.len();
+        // if end < len {
+        //     end = end + 1;
+        //     start = if exhausted { end } else { start };
+        //     if let Some(new_len) = usize::checked_sub(end, start) {
+        //         // SAFETY: `self` is checked to be valid and in bounds above.
+        //         unsafe {
+        //             let (ptr, own) = PtrOwn::from_mut(slice);
+        //             let ptr = get_offset_len_mut_noubcheck(ptr, start, new_len, ghost! { own.live() });
+        //             let own = ghost!{ ptr_own_slice_mut(own, self.start, self.end + 1).into_inner() };
+        //             return PtrOwn::as_mut(ptr, own)
+        //         }
+        //     }
+        // }
+        // slice_index_fail(start, end, slice.len())
     }
 }
 
 // #[unstable(feature = "new_range_api", issue = "125687")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for range::RangeInclusive<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.start@ <= self.last@ && self.last@ < slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(self.start@, self.last@ + 1) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < self.start@ || self.last@ < i ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         ops::RangeInclusive::from(self).get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         ops::RangeInclusive::from(self).get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { ops::RangeInclusive::from(self).get_unchecked(slice) }
+        unsafe { ops::RangeInclusive::from(self).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { ops::RangeInclusive::from(self).get_unchecked_mut(slice) }
+        unsafe { ops::RangeInclusive::from(self).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         ops::RangeInclusive::from(self).index(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         ops::RangeInclusive::from(self).index_mut(slice)
     }
@@ -1042,37 +1425,94 @@ unsafe impl<T> SliceIndex<[T]> for range::RangeInclusive<usize> {
 
 /// The methods `index` and `index_mut` panic if the end of the range is out of bounds.
 // #[stable(feature = "inclusive_range", since = "1.26.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
 unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.end@ < slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(0, self.end@ + 1) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> self.end@ < i ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&[T]> {
         (0..=self.end).get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
         (0..=self.end).get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (0..=self.end).get_unchecked(slice) }
+        unsafe { (0..=self.end).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut [T] {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (0..=self.end).get_unchecked_mut(slice) }
+        unsafe { (0..=self.end).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         (0..=self.end).index(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut [T] {
         (0..=self.end).index_mut(slice)
     }
@@ -1141,12 +1581,11 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 /// [`Index::index`]: ops::Index::index
 #[track_caller]
 // #[unstable(feature = "slice_range", issue = "76393")]
-*/
 #[must_use]
-#[erasure(private core::slice::index::range)]
-#[requires(int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end) && int_upper_bound(range.end_bound_logic(), bounds.end) <= bounds.end@)]
+#[erasure(core::slice::range)]
+#[requires(int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end@) && int_upper_bound(range.end_bound_logic(), bounds.end@) <= bounds.end@)]
 #[ensures(result.start@ == int_lower_bound(range.start_bound_logic()))]
-#[ensures(result.end@ == int_upper_bound(range.end_bound_logic(), bounds.end))]
+#[ensures(result.end@ == int_upper_bound(range.end_bound_logic(), bounds.end@))]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
     R: RangeBounds<usize>,
@@ -1179,11 +1618,11 @@ where
 
 /// Convert a lower bound to an inclusive lower bound, with a minimum of `0`.
 #[logic(open)]
-pub fn int_lower_bound(lo: Bound<&usize>) -> Int {
+pub fn int_lower_bound<T: DeepModel<DeepModelTy = Int>>(lo: Bound<T>) -> Int {
     pearlite! {
         match lo {
-            Bound::Included(lo) => lo@,
-            Bound::Excluded(lo) => lo@ + 1,
+            Bound::Included(lo) => lo.deep_model(),
+            Bound::Excluded(lo) => lo.deep_model() + 1,
             Bound::Unbounded => 0,
         }
     }
@@ -1191,17 +1630,16 @@ pub fn int_lower_bound(lo: Bound<&usize>) -> Int {
 
 /// Convert an upper bound to an exclusive upper bound, with a maximum of `len`.
 #[logic(open)]
-pub fn int_upper_bound(hi: Bound<&usize>, len: usize) -> Int {
+pub fn int_upper_bound<T: DeepModel<DeepModelTy = Int>>(hi: Bound<T>, len: Int) -> Int {
     pearlite! {
         match hi {
-            Bound::Included(hi) => hi@ + 1,
-            Bound::Excluded(hi) => hi@,
-            Bound::Unbounded => len@,
+            Bound::Included(hi) => hi.deep_model() + 1,
+            Bound::Excluded(hi) => hi.deep_model(),
+            Bound::Unbounded => len,
         }
     }
 }
 
-/*
 /// Performs bounds checking of a range without panicking.
 ///
 /// This is a version of [`range()`] that returns [`None`] instead of panicking.
@@ -1234,9 +1672,11 @@ pub fn int_upper_bound(hi: Bound<&usize>, len: usize) -> Int {
 /// [`Index::index`]: ops::Index::index
 // #[unstable(feature = "slice_range", issue = "76393")]
 #[must_use]
+#[erasure(core::slice::try_range)]
+#[requires(false)]
 pub fn try_range<R>(range: R, bounds: ops::RangeTo<usize>) -> Option<ops::Range<usize>>
 where
-    R: ops::RangeBounds<usize>,
+    R: RangeBounds<usize>,
 {
     let len = bounds.end;
 
@@ -1252,11 +1692,25 @@ where
         ops::Bound::Unbounded => len,
     };
 
-    if start > end || end > len { None } else { Some(ops::Range { start, end }) }
+    if start > end || end > len {
+        None
+    } else {
+        Some(ops::Range { start, end })
+    }
 }
 
 /// Converts a pair of `ops::Bound`s into `ops::Range` without performing any
 /// bounds checking or (in debug) overflow checking.
+#[erasure(private core::slice::index::into_range_unchecked)]
+#[requires(match start {
+    Bound::Excluded(start) => start@ < usize::MAX@,
+    _ => true,
+})]
+#[requires(match end {
+    Bound::Included(end) => end@ < usize::MAX@,
+    _ => true,
+})]
+#[ensures(result.start@ == int_lower_bound(start) && result.end@ == int_upper_bound(end, len@))]
 pub(crate) fn into_range_unchecked(
     len: usize,
     (start, end): (ops::Bound<usize>, ops::Bound<usize>),
@@ -1277,6 +1731,11 @@ pub(crate) fn into_range_unchecked(
 
 /// Converts pair of `ops::Bound`s into `ops::Range`.
 /// Returns `None` on overflowing indices.
+#[erasure(private core::slice::index::into_range)]
+#[ensures(match result {
+    Some(result) => result.start@ == int_lower_bound(start) && result.end@ == int_upper_bound(end, len@),
+    None => (match start { Bound::Excluded(start) => start@ == usize::MAX@, _ => false }) || (match end { Bound::Included(end) => end@ == usize::MAX@, _ => false }),
+})]
 pub(crate) fn into_range(
     len: usize,
     (start, end): (ops::Bound<usize>, ops::Bound<usize>),
@@ -1302,6 +1761,18 @@ pub(crate) fn into_range(
 
 /// Converts pair of `ops::Bound`s into `ops::Range`.
 /// Panics on overflowing indices.
+#[erasure(private core::slice::index::into_slice_range)]
+#[requires(match end {
+    Bound::Included(end) => end@ < len@,
+    Bound::Excluded(end) => end@ <= len@,
+    Bound::Unbounded => true,
+})]
+#[requires(match start {
+    Bound::Included(start) => start@ <= int_upper_bound(end, len@),
+    Bound::Excluded(start) => start@ < int_upper_bound(end, len@),
+    Bound::Unbounded => true,
+})]
+#[ensures(result.start@ == int_lower_bound(start) && result.end@ == int_upper_bound(end, len@))]
 pub(crate) fn into_slice_range(
     len: usize,
     (start, end): (ops::Bound<usize>, ops::Bound<usize>),
@@ -1335,36 +1806,95 @@ pub(crate) fn into_slice_range(
 unsafe impl<T> SliceIndex<[T]> for (ops::Bound<usize>, ops::Bound<usize>) {
     type Output = [T];
 
+    #[logic(open, inline)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! {
+            int_lower_bound(self.0) <= int_upper_bound(self.1, slice@.len())
+                && int_upper_bound(self.1, slice@.len()) <= slice@.len()
+        }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == slice@.subsequence(int_lower_bound(self.0), int_upper_bound(self.1, slice@.len())) }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> i < int_lower_bound(self.0) || int_upper_bound(self.1, old@.len()) <= i
+                ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
     fn get(self, slice: &[T]) -> Option<&Self::Output> {
         into_range(slice.len(), self)?.get(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
     fn get_mut(self, slice: &mut [T]) -> Option<&mut Self::Output> {
         into_range(slice.len(), self)?.get_mut(slice)
     }
 
     #[inline]
-    unsafe fn get_unchecked(self, slice: *const [T]) -> *const Self::Output {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
+    #[requires(own.ptr() == slice)]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    unsafe fn get_unchecked_own(
+        self,
+        slice: *const [T],
+        own: Ghost<&PtrOwn<[T]>>,
+    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { into_range_unchecked(slice.len(), self).get_unchecked(slice) }
+        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_own(slice, own) }
     }
 
     #[inline]
-    unsafe fn get_unchecked_mut(self, slice: *mut [T]) -> *mut Self::Output {
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
+    #[requires(own.ptr() == slice as *const [T])]
+    #[requires(self.in_bounds(*own.val()))]
+    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
+    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
+    unsafe fn get_unchecked_mut_own(
+        self,
+        slice: *mut [T],
+        own: Ghost<&mut PtrOwn<[T]>>,
+    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_mut(slice) }
+        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_mut_own(slice, own) }
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &Self::Output {
         into_slice_range(slice.len(), self).index(slice)
     }
 
     #[inline]
+    #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
     fn index_mut(self, slice: &mut [T]) -> &mut Self::Output {
         into_slice_range(slice.len(), self).index_mut(slice)
     }
 }
- */

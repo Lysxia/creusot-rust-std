@@ -1,4 +1,7 @@
 TARGETS="\
+  into_range_unchecked \
+  into_range \
+  into_slice_range \
   add_own \
   block_get_2_ghost \
   split_at \

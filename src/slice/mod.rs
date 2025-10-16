@@ -259,7 +259,8 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     let (ptr, owns) = self_.as_ptr_own();
     let (owns0, owns1) = ghost! {
         owns.into_inner().split_at_ghost(*Int::new(mid as i128))
-    }.split();
+    }
+    .split();
     assert_unsafe_precondition!(
         check_library_ub,
         "slice::split_at_unchecked requires the index to be within the slice",

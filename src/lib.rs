@@ -14,6 +14,7 @@
     slice_swap_unchecked,
     slice_index_methods,
     rustc_allow_const_fn_unstable,
+    slice_range,
     get_disjoint_mut_helpers
 )]
 pub mod intrinsics;
