@@ -1,7 +1,7 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
 use creusot_contracts::ghost::{PtrLive, PtrOwn};
-use creusot_contracts::*;
+use creusot_contracts::prelude::*;
 
 mod const_ptr;
 mod mut_ptr;

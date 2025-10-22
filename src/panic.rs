@@ -1,4 +1,4 @@
-use creusot_contracts::*;
+use creusot_contracts::prelude::*;
 
 pub macro const_panic {
     ($const_msg:literal, $runtime_msg:literal, $($arg:ident : $ty:ty = $val:expr),* $(,)?) => {{

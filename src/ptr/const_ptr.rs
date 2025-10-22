@@ -1,7 +1,7 @@
 use super::PtrAddExt;
 use crate::intrinsics::const_eval_select;
 use crate::ub_checks;
-use creusot_contracts::{ghost::PtrLive, *};
+use creusot_contracts::{ghost::PtrLive, prelude::*, std};
 
 impl<T> PtrAddExt<T> for *const T {
     #[requires(live.contains(self))]

@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 pub use ::core::intrinsics::const_eval_select;
-use creusot_contracts::{ghost::PtrOwn, std::ptr::metadata_logic, *};
+use creusot_contracts::{ghost::PtrOwn, prelude::*, std::ptr::metadata_logic};
 
 #[trusted]
 #[check(ghost_trusted)]

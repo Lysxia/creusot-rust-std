@@ -1,6 +1,6 @@
 use crate::ub_checks;
 use ::std::ptr;
-use creusot_contracts::{ghost::PtrOwn, *};
+use creusot_contracts::{ghost::PtrOwn, prelude::*};
 
 #[requires(own.ptr().thin() == data)]
 #[requires(len@ == own.len())]

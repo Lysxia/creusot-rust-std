@@ -16,8 +16,9 @@ use core::range;
 use creusot_contracts::std::ptr::metadata_logic;
 use creusot_contracts::{
     ghost::{PtrLive, PtrOwn},
+    prelude::*,
+    std,
     std::ops::RangeBounds,
-    *,
 };
 
 // #[stable(feature = "rust1", since = "1.0.0")]

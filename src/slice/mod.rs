@@ -10,7 +10,10 @@ use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
 use creusot_contracts::ghost::PtrOwn;
-use creusot_contracts::{Clone, PartialEq, std::ops::RangeBounds, *};
+use creusot_contracts::{
+    prelude::{Clone, PartialEq, *},
+    std::ops::RangeBounds,
+};
 // use core::num::NonZero;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeInclusive};
 // use core::panic::const_panic;
