@@ -13,9 +13,7 @@ macro_rules! assert_unsafe_precondition {
             //
             // LLVM on the other hand sees the constant branch, so if it's `false`, it can immediately delete it without
             // inlining the check. If it's `true`, it can inline it and get significantly better performance.
-            #[rustc_no_mir_inline]
             #[inline]
-            #[rustc_nounwind]
             #[requires($pre)]
             const fn precondition_check($($name:$ty),*) {
                 // Add parentheses because this gets re-parsed by syn (via `requires`),
