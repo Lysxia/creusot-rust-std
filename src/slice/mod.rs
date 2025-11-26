@@ -69,8 +69,8 @@ use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_p
 #[ensures(result.1.ptr() == (s.ptr() as *const T).offset_logic(j))]
 #[ensures(*result.0.val() == s.val()@[i])]
 #[ensures(*result.1.val() == s.val()@[j])]
-#[ensures(*(^(*result).0).val() == (^*s).val()@[i])]
-#[ensures(*(^(*result).1).val() == (^*s).val()@[j])]
+#[ensures((^(*result).0).ptr() == (*result).0.ptr() ==> *(^(*result).0).val() == (^*s).val()@[i])]
+#[ensures((^(*result).1).ptr() == (*result).1.ptr() ==> *(^(*result).1).val() == (^*s).val()@[j])]
 #[ensures((^*s).ptr() == s.ptr())]
 #[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^*s).val()@[k] == s.val()@[k])]
 pub fn block_get_2_ghost<T>(

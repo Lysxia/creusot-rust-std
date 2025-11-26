@@ -42,6 +42,6 @@ impl<T> PtrAddExt<T> for *const T {
         );
 
         // SAFETY: the caller must uphold the safety contract for `offset`.
-        unsafe { std::intrinsics::add_own(self, count, live) }
+        unsafe { std::intrinsics::add_live(self, count, live) }
     }
 }

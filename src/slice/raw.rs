@@ -37,7 +37,7 @@ pub unsafe fn from_raw_parts_own<'a, T>(
 #[requires(own.ptr().thin() == data as *const T)]
 #[requires(len@ == own.len())]
 #[ensures(result@ == own.val()@)]
-#[ensures((^*own).ptr().thin() == data as *const T)]
+#[ensures((^*own).ptr() == own.ptr())]
 #[ensures((^result)@ == (^*own).val()@)]
 #[erasure(::std::slice::from_raw_parts_mut)]
 pub unsafe fn from_raw_parts_mut_own<T>(

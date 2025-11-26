@@ -42,6 +42,6 @@ impl<T> PtrAddExt<T> for *mut T {
         );
 
         // SAFETY: the caller must uphold the safety contract for `offset`.
-        unsafe { std::intrinsics::add_own_mut(self, count, live) }
+        unsafe { std::intrinsics::add_live_mut(self, count, live) }
     }
 }
