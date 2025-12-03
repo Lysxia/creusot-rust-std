@@ -69,28 +69,22 @@ use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_p
 #[ensures(result.1.ptr() == (s.ptr() as *const T).offset_logic(j))]
 #[ensures(*result.0.val() == s.val()@[i])]
 #[ensures(*result.1.val() == s.val()@[j])]
-#[ensures((^(*result).0).ptr() == (*result).0.ptr() ==> *(^(*result).0).val() == (^*s).val()@[i])]
-#[ensures((^(*result).1).ptr() == (*result).1.ptr() ==> *(^(*result).1).val() == (^*s).val()@[j])]
+#[ensures(*(^(*result).0).val() == (^*s).val()@[i])]
+#[ensures(*(^(*result).1).val() == (^*s).val()@[j])]
 #[ensures((^*s).ptr() == s.ptr())]
-#[ensures(forall<k: Int> 0 <= k && k < s.len() && k != i && k != j ==> (^*s).val()@[k] == s.val()@[k])]
-pub fn block_get_2_ghost<T>(
+#[ensures(forall<k: Int> k != i && k != j ==> (^*s).val()@.get(k) == s.val()@.get(k))]
+pub fn block_get_2<T>(
     s: Ghost<&mut PtrOwn<[T]>>,
     i: Int,
     j: Int,
 ) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
     ghost! {
         if i < j {
-            let (_, si) = s.into_inner().split_at_mut_ghost(i);
-            let (si, sj) = si.split_at_mut_ghost(j - i);
-            let oi = si.elements_mut().pop_front_ghost().unwrap();
-            let oj = sj.elements_mut().pop_front_ghost().unwrap();
-            (oi, oj)
+            let (s, sj) = s.into_inner().split_at_mut(j);
+            (s.index_mut(i), sj.index_mut(*Int::new(0)))
         } else {
-            let (_, sj) = s.into_inner().split_at_mut_ghost(j);
-            let (sj, si) = sj.split_at_mut_ghost(i - j);
-            let oi = si.elements_mut().pop_front_ghost().unwrap();
-            let oj = sj.elements_mut().pop_front_ghost().unwrap();
-            (oi, oj)
+            let (s, si) = s.into_inner().split_at_mut(i);
+            (si.index_mut(*Int::new(0)), s.index_mut(j))
         }
     }
 }
@@ -126,6 +120,7 @@ pub unsafe fn get_unchecked_mut<T, I>(self_: &mut [T], index: I) -> &mut I::Outp
 where
     I: SliceIndex<[T]>,
 {
+    proof_assert!(forall<p: *mut [T], q: *mut [T]> p.thin() == q.thin() && p.len_logic() == q.len_logic() ==> p == q);
     let (ptr, owns) = PtrOwn::from_mut(self_);
     // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
     // the slice is dereferenceable because `self` is a safe reference.
@@ -158,18 +153,18 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
     let own = ghost! {
         if a == b {
             let a_ = Int::new(a as i128).into_inner();
-            vptr::DisjointOrEqual::Equal(owns.index_ptr_own_mut_ghost(a_))
+            vptr::DisjointOrEqual::Equal(owns.index_mut(a_))
         } else {
             let a_ = Int::new(a as i128).into_inner();
             let b_ = Int::new(b as i128).into_inner();
-            let (own_a, own_b) = block_get_2_ghost(owns, a_, b_).into_inner();
+            let (own_a, own_b) = block_get_2(owns, a_, b_).into_inner();
             vptr::DisjointOrEqual::Disjoint(own_a, own_b)
         }
     };
 
     // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
     unsafe {
-        vptr::swap_disjoint(ptr.add_own(a, live), ptr.add_own(b, live), own);
+        vptr::swap_disjoint(ptr.add_live(a, live), ptr.add_live(b, live), own);
     }
 }
 
@@ -261,7 +256,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     let len = self_.len();
     let (ptr, owns) = self_.as_ptr_own();
     let (owns0, owns1) = ghost! {
-        owns.into_inner().split_at_ghost(*Int::new(mid as i128))
+        owns.into_inner().split_at(*Int::new(mid as i128))
     }
     .split();
     assert_unsafe_precondition!(
@@ -276,7 +271,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
         (
             from_raw_parts_own(ptr, mid, owns0),
             from_raw_parts_own(
-                ptr.add_own(mid, ghost! { owns0.live() }),
+                ptr.add_live(mid, ghost! { owns0.live() }),
                 unchecked_sub(len, mid),
                 owns1,
             ),
@@ -297,7 +292,7 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     let (ptr, owns) = self_.as_mut_ptr_own();
     let (owns, live) = ghost! { owns.into_inner().live_mut() }.split();
     let (owns0, owns1) = ghost! {
-        owns.into_inner().split_at_mut_ghost(*Int::new(mid as i128))
+        owns.into_inner().split_at_mut(*Int::new(mid as i128))
     }
     .split();
 
@@ -315,7 +310,7 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     unsafe {
         (
             from_raw_parts_mut_own(ptr, mid, owns0),
-            from_raw_parts_mut_own(ptr.add_own(mid, live), unchecked_sub(len, mid), owns1),
+            from_raw_parts_mut_own(ptr.add_live(mid, live), unchecked_sub(len, mid), owns1),
         )
     }
 }

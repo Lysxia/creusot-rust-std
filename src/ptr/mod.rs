@@ -22,7 +22,7 @@ pub trait PtrAddExt<T> {
     /// >   In particular, this range must not “wrap around” the edge of the address space.
     ///
     #[requires(false)]
-    unsafe fn add_own(self, offset: usize, own: Ghost<&PtrLive<T>>) -> Self;
+    unsafe fn add_live(self, offset: usize, own: Ghost<PtrLive<T>>) -> Self;
 }
 
 /// Align pointer `p`.

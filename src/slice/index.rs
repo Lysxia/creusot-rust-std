@@ -110,7 +110,7 @@ unsafe fn get_offset_len_noubcheck<T>(
     ptr: *const [T],
     offset: usize,
     len: usize,
-    live: Ghost<&PtrLive<T>>,
+    live: Ghost<PtrLive<T>>,
 ) -> *const [T] {
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
@@ -128,7 +128,7 @@ unsafe fn get_offset_len_mut_noubcheck<T>(
     ptr: *mut [T],
     offset: usize,
     len: usize,
-    live: Ghost<&PtrLive<T>>,
+    live: Ghost<PtrLive<T>>,
 ) -> *mut [T] {
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
@@ -365,7 +365,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             let ptr = slice_get_unchecked_raw(slice, self, own);
             (
                 ptr,
-                ghost! { own.index_ptr_own_ref_ghost(*Int::new(self as i128)) },
+                ghost! { own.index(*Int::new(self as i128)) },
             )
         }
     }
@@ -376,7 +376,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     #[ensures(result.0 as *const T == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -394,7 +394,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             let ptr = slice_get_unchecked_raw_mut(slice, self, ghost! { &**own });
             (
                 ptr,
-                ghost! { own.into_inner().index_ptr_own_mut_ghost(*Int::new(self as i128)) },
+                ghost! { own.into_inner().index_mut(*Int::new(self as i128)) },
             )
         }
     }
@@ -499,8 +499,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
 #[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
 fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost<&PtrOwn<[T]>> {
     ghost! {
-        let (own, _) = own.into_inner().split_at_ghost(*Int::new(end as i128));
-        let (_, own) = own.split_at_ghost(*Int::new(start as i128));
+        let (own, _) = own.into_inner().split_at(*Int::new(end as i128));
+        let (_, own) = own.split_at(*Int::new(start as i128));
         own
     }
 }
@@ -510,7 +510,7 @@ fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost
 #[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
 #[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
 #[ensures(own.ptr() == (^own).ptr())]
-#[ensures((^result).ptr() == result.ptr() ==> (^result).val()@ == (^own).val()@.subsequence(start@, end@))]
+#[ensures((^result).val()@ == (^own).val()@.subsequence(start@, end@))]
 #[ensures(forall<i: Int> i < start@ || end@ <= i ==> own.val()@.get(i) == (^own).val()@.get(i))]
 fn ptr_own_slice_mut<T>(
     own: Ghost<&mut PtrOwn<[T]>>,
@@ -518,8 +518,10 @@ fn ptr_own_slice_mut<T>(
     end: usize,
 ) -> Ghost<&mut PtrOwn<[T]>> {
     ghost! {
-        let (own, _) = own.into_inner().split_at_mut_ghost(*Int::new(end as i128));
-        let (_, own) = own.split_at_mut_ghost(*Int::new(start as i128));
+        let _own0 = snapshot!{own};
+        let (own, _right) = own.into_inner().split_at_mut(*Int::new(end as i128));
+        proof_assert!{ resolve(_right) ==> forall<i: Int> end@ <= i ==> _own0.val()@.get(i) == (^_own0).val()@.get(i) }
+        let (_, own) = own.split_at_mut(*Int::new(start as i128));
         own
     }
 }
@@ -638,7 +640,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -698,9 +700,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let (ptr, own) = PtrOwn::from_mut(slice);
+                let (ptr, mut own) = PtrOwn::from_mut(slice);
                 let ptr =
-                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost!{ own.live_mut().1 });
                 let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
                 PtrOwn::as_mut(ptr, own)
             }
@@ -774,7 +776,7 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -870,7 +872,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeTo<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -966,7 +968,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -1077,7 +1079,7 @@ unsafe impl<T> SliceIndex<[T]> for core::range::RangeFrom<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -1272,7 +1274,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -1402,7 +1404,7 @@ unsafe impl<T> SliceIndex<[T]> for range::RangeInclusive<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -1498,7 +1500,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,
@@ -1880,7 +1882,7 @@ unsafe impl<T> SliceIndex<[T]> for (ops::Bound<usize>, ops::Bound<usize>) {
     #[ensures(result.0 as *const Self::Output == result.1.ptr())]
     #[ensures(self.slice_index(*own.val(), *result.1.val()))]
     #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> self.slice_index(*(^*own).val(), *(^*result.1).val()))]
+    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
     #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
     unsafe fn get_unchecked_mut_own(
         self,

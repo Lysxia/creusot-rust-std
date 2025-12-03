@@ -8,7 +8,7 @@ impl<T> PtrAddExt<T> for *const T {
     #[requires(live.contains(self.offset_logic(count@)))]
     #[ensures(result == self.offset_logic(count@))]
     #[erasure(<*const T>::add)]
-    unsafe fn add_own(self, count: usize, live: Ghost<&PtrLive<T>>) -> Self {
+    unsafe fn add_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self {
         #[trusted]
         // #[cfg(debug_assertions)]
         // #[inline]
