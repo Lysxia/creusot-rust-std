@@ -79,11 +79,15 @@ pub fn block_get_2<T>(
     j: Int,
 ) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
     ghost! {
+        let _s = snapshot!(s);
         if i < j {
             let (s, sj) = s.into_inner().split_at_mut(j);
+            proof_assert!{ forall<k> k < j ==> (^*_s).val()@.get(k) == (^s).val()@.get(k)};
+            proof_assert!{ forall<k> k != i && k != j ==> k < i || k > i };
             (s.index_mut(i), sj.index_mut(*Int::new(0)))
         } else {
             let (s, si) = s.into_inner().split_at_mut(i);
+            proof_assert!{ forall<k> i < k ==> (^*_s).val()@.get(k) == (^si).val()@.get(k-i)};
             (si.index_mut(*Int::new(0)), s.index_mut(j))
         }
     }
