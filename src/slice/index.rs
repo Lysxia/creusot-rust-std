@@ -14,13 +14,7 @@ use core::ops::Bound;
 use core::range;
 #[cfg(creusot)]
 use creusot_std::std::ptr::metadata_logic;
-use creusot_std::{
-    ghost::perm::Perm,
-    prelude::*,
-    std,
-    std::ops::RangeBounds,
-    std::ptr::PtrLive,
-};
+use creusot_std::{ghost::perm::Perm, prelude::*, std, std::ops::RangeBounds, std::ptr::PtrLive};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -137,14 +131,14 @@ unsafe fn get_offset_len_mut_noubcheck<T>(
     aggregate_raw_ptr_mut_slice(ptr, len)
 }
 
-#[trusted]
+#[trusted] // Trusted intrinsic
 #[erasure(core::intrinsics::aggregate_raw_ptr::<*const [T], *const T, usize>)]
 #[ensures(result as *const T == ptr && metadata_logic(result) == len)]
 fn aggregate_raw_ptr_slice<T>(ptr: *const T, len: usize) -> *const [T] {
     core::intrinsics::aggregate_raw_ptr(ptr, len)
 }
 
-#[trusted]
+#[trusted] // Trusted intrinsic
 #[erasure(core::intrinsics::aggregate_raw_ptr::<*mut [T], *mut T, usize>)]
 #[ensures(result as *mut T == ptr && metadata_logic(result) == len)]
 fn aggregate_raw_ptr_mut_slice<T>(ptr: *mut T, len: usize) -> *mut [T] {
@@ -364,10 +358,7 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             // precondition of this function twice.
             core::intrinsics::assume(self < slice.len());
             let ptr = slice_get_unchecked_raw(slice, self, perm);
-            (
-                ptr,
-                ghost! { perm.index(*Int::new(self as i128)) },
-            )
+            (ptr, ghost! { perm.index(*Int::new(self as i128)) })
         }
     }
 
@@ -498,7 +489,11 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
 #[requires(start <= end && end@ <= perm.len())]
 #[ensures(*result.ward() as *const T == (*perm.ward() as *const T).offset_logic(start@))]
 #[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
-fn ptr_perm_slice<T>(perm: Ghost<&Perm<*const [T]>>, start: usize, end: usize) -> Ghost<&Perm<*const [T]>> {
+fn ptr_perm_slice<T>(
+    perm: Ghost<&Perm<*const [T]>>,
+    start: usize,
+    end: usize,
+) -> Ghost<&Perm<*const [T]>> {
     ghost! {
         let (perm, _) = perm.into_inner().split_at(*Int::new(end as i128));
         let (_, perm) = perm.split_at(*Int::new(start as i128));
@@ -567,7 +562,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             let (ptr, perm) = Perm::from_ref(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
+                let ptr =
+                    get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
                 let perm = ghost! { ptr_perm_slice(perm, self.start, self.end).into_inner() };
                 Some(Perm::as_ref(ptr, perm))
             }
@@ -681,7 +677,8 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, perm) = Perm::from_ref(slice);
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
+                let ptr =
+                    get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
                 let perm = ghost! { ptr_perm_slice(perm, self.start, self.end).into_inner() };
                 Perm::as_ref(ptr, perm)
             }
@@ -703,8 +700,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let (ptr, mut perm) = Perm::from_mut(slice);
-                let ptr =
-                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost!{ perm.live_mut().1 });
+                let ptr = get_offset_len_mut_noubcheck(
+                    ptr,
+                    self.start,
+                    new_len,
+                    ghost! { perm.live_mut().1 },
+                );
                 let perm = ghost! { ptr_perm_slice_mut(perm, self.start, self.end).into_inner() };
                 Perm::as_mut(ptr, perm)
             }
@@ -1240,7 +1241,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         }
     }
 
-    #[trusted]
+    #[trusted] // TODO
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
     #[ensures(match result {
@@ -1252,7 +1253,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // if *self.end() == usize::MAX { None } else { self.into_slice_range().get(slice) }
     }
 
-    #[trusted]
+    #[trusted] // TODO
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
     #[ensures(match result {
@@ -1264,7 +1265,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // if *self.end() == usize::MAX { None } else { self.into_slice_range().get_mut(slice) }
     }
 
-    #[trusted]
+    #[trusted] // TODO
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
     #[requires(*perm.ward() == slice)]

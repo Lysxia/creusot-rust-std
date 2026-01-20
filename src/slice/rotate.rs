@@ -1,5 +1,5 @@
-use crate::slice::is_zst;
 use core::mem::MaybeUninit;
+use core::mem::SizedTypeProperties as _;
 use core::{cmp, ptr};
 use creusot_std::prelude::*;
 
@@ -12,11 +12,10 @@ type BufType = [usize; 32];
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted]
+#[trusted] // TODO
 #[inline]
 pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
-    // if T::IS_ZST {
-    if is_zst::<T>() {
+    if T::IS_ZST {
         return;
     }
     // abort early if the rotate is a no-op
@@ -49,7 +48,7 @@ pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
 ///
 /// The specified range must be valid for reading and writing.
 #[inline]
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
     // The `[T; 0]` here is to ensure this is appropriately aligned for T
@@ -122,7 +121,7 @@ unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted]
+#[trusted] // TODO
 #[inline]
 unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
     // Algorithm 2
@@ -228,7 +227,7 @@ unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted]
+#[trusted] // TODO
 #[inline]
 unsafe fn ptr_rotate_swap<T>(mut left: usize, mut mid: *mut T, mut right: usize) {
     loop {

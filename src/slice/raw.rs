@@ -73,9 +73,9 @@ pub unsafe fn from_raw_parts_mut_perm<T>(
 fn div_mono_lemma() {}
 
 /// Use `from_raw_parts_perm` instead.
-#[trusted]
+#[trusted] // To remove
 #[requires(false)]
-pub const unsafe fn from_raw_parts<'a, T>(data: *const T, len: usize) -> &'a [T] {
+pub(crate) const unsafe fn from_raw_parts<'a, T>(data: *const T, len: usize) -> &'a [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(
@@ -95,9 +95,9 @@ pub const unsafe fn from_raw_parts<'a, T>(data: *const T, len: usize) -> &'a [T]
 }
 
 /// Use `from_raw_parts_mut_perm` instead.
-#[trusted]
+#[trusted] // To remove
 #[requires(false)]
-pub const unsafe fn from_raw_parts_mut<'a, T>(data: *mut T, len: usize) -> &'a mut [T] {
+pub(crate) const unsafe fn from_raw_parts_mut<'a, T>(data: *mut T, len: usize) -> &'a mut [T] {
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
     unsafe {
         // ub_checks::assert_unsafe_precondition!(

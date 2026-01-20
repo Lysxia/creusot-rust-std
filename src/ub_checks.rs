@@ -35,7 +35,7 @@ macro_rules! assert_unsafe_precondition {
 pub use assert_unsafe_precondition;
 pub use core::intrinsics::ub_checks as check_library_ub;
 
-#[trusted]
+#[trusted] // TODO
 #[erasure(private core::ub_checks::check_language_ub)]
 pub(crate) fn check_language_ub() -> bool {
     // Only used for UB checks so we may const_eval_select.

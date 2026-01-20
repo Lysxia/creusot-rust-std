@@ -10,8 +10,8 @@ use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
 use creusot_std::{
-    prelude::{Clone, PartialEq, *},
     ghost::perm::Perm,
+    prelude::{Clone, PartialEq, *},
     std::ops::RangeBounds,
 };
 // use core::num::NonZero;
@@ -319,7 +319,7 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 /// Function to calculate lengths of the middle and trailing slice for `align_to{,_mut}`.
 pub fn align_to_offsets<T, U>(self_: &[T]) -> (usize, usize) {
     // What we gonna do about `rest` is figure out what multiple of `U`s we can put in a
@@ -358,11 +358,10 @@ pub fn align_to_offsets<T, U>(self_: &[T]) -> (usize, usize) {
     (us_len, ts_len)
 }
 
-#[trusted]
+#[trusted] // TODO
 pub unsafe fn align_to<T, U>(self_: &[T]) -> (&[T], &[U], &[T]) {
     // Note that most of this function will be constant-evaluated,
-    // if U::IS_ZST || T::IS_ZST
-    if is_zst::<U>() || is_zst::<T>() {
+    if U::IS_ZST || T::IS_ZST {
         // handle ZSTs specially, which is – don't handle them at all.
         return (self_, &[], &[]);
     }
@@ -392,11 +391,10 @@ pub unsafe fn align_to<T, U>(self_: &[T]) -> (&[T], &[U], &[T]) {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub unsafe fn align_to_mut<T, U>(self_: &mut [T]) -> (&mut [T], &mut [U], &mut [T]) {
     // Note that most of this function will be constant-evaluated,
-    // if U::IS_ZST || T::IS_ZST
-    if is_zst::<U>() || is_zst::<T>() {
+    if U::IS_ZST || T::IS_ZST {
         // handle ZSTs specially, which is – don't handle them at all.
         return (self_, &mut [], &mut []);
     }
@@ -439,7 +437,7 @@ pub unsafe fn align_to_mut<T, U>(self_: &mut [T]) -> (&mut [T], &mut [U], &mut [
 
 // Prove that the following safe abstractions (in library/core/src/slice/mod.rs) do not cause undefined behavior:
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn first_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
@@ -452,7 +450,7 @@ pub fn first_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]> {
@@ -466,7 +464,7 @@ pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn split_first_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T; N], &[T])> {
@@ -479,7 +477,7 @@ pub fn split_first_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T; N], &[T
     Some((unsafe { &*(first.as_ptr().cast::<[T; N]>()) }, tail))
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn split_first_chunk_mut<T, const N: usize>(
@@ -495,7 +493,7 @@ pub fn split_first_chunk_mut<T, const N: usize>(
     Some((unsafe { &mut *(first.as_mut_ptr().cast::<[T; N]>()) }, tail))
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn split_last_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T], &[T; N])> {
@@ -509,7 +507,7 @@ pub fn split_last_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T], &[T; N]
     Some((init, unsafe { &*(last.as_ptr().cast::<[T; N]>()) }))
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut [T], &mut [T; N])> {
@@ -524,7 +522,7 @@ pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut 
     Some((init, unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) }))
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn last_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
@@ -539,7 +537,7 @@ pub fn last_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
     Some(unsafe { &*(last.as_ptr().cast::<[T; N]>()) })
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 /* pub const */
 pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]> {
@@ -555,7 +553,7 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
     Some(unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) })
 }
 
-#[trusted]
+#[trusted] // TODO
 /* pub const */
 pub fn reverse<T>(self_: &mut [T]) {
     let half_len = self_.len() / 2;
@@ -646,7 +644,7 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
         ==> len % N@ + i * N@ + j <= len % N@ + len / N@ * N@ - 1
     };
     proof_assert! { forall<i, j> 0 <= i && i < len@ && 0 <= j && j < N@
-      ==> array_slice@[i]@[j] == _mn[i * N@ + j]};
+    ==> array_slice@[i]@[j] == _mn[i * N@ + j]};
     (remainder, array_slice)
 }
 
@@ -719,7 +717,7 @@ pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T],
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn binary_search_by<'a, T, F>(self_: &'a [T], mut f: F) -> Result<usize, usize>
 where
     F: FnMut(&'a T) -> Ordering,
@@ -774,7 +772,7 @@ where
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 #[requires(false)]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
@@ -880,7 +878,7 @@ where
     self_.split_at_mut(next_write)
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     assert!(mid <= self_.len());
     let k = self_.len() - mid;
@@ -893,7 +891,7 @@ pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     assert!(k <= self_.len());
     let mid = self_.len() - k;
@@ -906,7 +904,7 @@ pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 /* pub const */
 pub fn copy_from_slice<T>(self_: &mut [T], src: &[T])
 where
@@ -940,7 +938,7 @@ where
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn copy_within<T, R: RangeBounds<usize>>(self_: &mut [T], src: R, dest: usize)
 where
     T: Copy,
@@ -962,7 +960,7 @@ where
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     assert!(
         self_.len() == other.len(),
@@ -976,7 +974,7 @@ pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn as_simd<T, const LANES: usize>(self_: &[T]) -> (&[T], &[Simd<T, LANES>], &[T])
 where
     Simd<T, LANES>: AsRef<[T; LANES]>,
@@ -993,7 +991,7 @@ where
     unsafe { self_.align_to() }
 }
 
-#[trusted]
+#[trusted] // TODO
 pub fn as_simd_mut<T, const LANES: usize>(
     self_: &mut [T],
 ) -> (&mut [T], &mut [Simd<T, LANES>], &mut [T])
@@ -1012,7 +1010,7 @@ where
     unsafe { self_.align_to_mut() }
 }
 
-#[trusted]
+#[trusted] // TODO
 // #[erasure(<[T]>::get_disjoint_mut::<I, N>)] // TODO: not the same traits
 pub fn get_disjoint_mut<T, I, const N: usize>(
     self_: &mut [T],
@@ -1028,7 +1026,7 @@ where
 }
 
 #[allow(unused)] // TODO
-#[trusted]
+#[trusted] // TODO
 // #[erasure(<[T]>::get_disjoint_unchecked_mut::<I, N>)] // TODO: not the same traits
 pub unsafe fn get_disjoint_unchecked_mut<T, I, const N: usize>(
     self_: &mut [T],
@@ -1066,10 +1064,9 @@ pub trait ArraySliceExt<T, const N: usize> {
 }
 
 impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
-    #[trusted]
+    #[trusted] // TODO
     fn as_flattened(&self) -> &[T] {
-        let len = // if T::IS_ZST {
-        if is_zst::<T>() {
+        let len = if T::IS_ZST {
             self.len().checked_mul(N).expect("slice len overflow")
         } else {
             // SAFETY: `self.len() * N` cannot overflow because `self` is
@@ -1080,7 +1077,7 @@ impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
         unsafe { from_raw_parts(self.as_ptr().cast(), len) }
     }
 
-    #[trusted]
+    #[trusted] // TODO
     fn as_flattened_mut(&mut self) -> &mut [T] {
         let len = if T::IS_ZST {
             self.len().checked_mul(N).expect("slice len overflow")
@@ -1094,7 +1091,7 @@ impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
     }
 }
 
-#[trusted]
+#[trusted] // TODO
 // from std::hint since 1.89
 fn select_unpredictable<T>(b: bool, true_val: T, false_val: T) -> T {
     if b { true_val } else { false_val }
@@ -1142,7 +1139,7 @@ mod private_get_disjoint_mut_index {
     // impl Sealed for range::RangeInclusive<usize> {}
 }
 
-#[trusted]
+#[trusted] // TODO
 /// This checks every index against each other, and against `len`.
 ///
 /// This will do `binomial(N + 1, 2) = N * (N + 1) / 2 = 0, 1, 3, 6, 10, ..`
@@ -1165,13 +1162,6 @@ pub fn get_disjoint_check_valid<I: GetDisjointMutIndex, const N: usize>(
         }
     }
     Ok(())
-}
-
-// Placeholder for T::IS_ZST
-#[trusted]
-#[requires(false)]
-fn is_zst<T>() -> bool {
-    false
 }
 
 // The verification must be unbounded---it must hold for slices of arbitrary length.

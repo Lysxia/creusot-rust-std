@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 pub use ::core::intrinsics::const_eval_select;
-use creusot_std::{ghost::perm::Perm, prelude::*};
 #[cfg(creusot)]
 use creusot_std::std::ptr::metadata_logic;
+use creusot_std::{ghost::perm::Perm, prelude::*};
 
 // Intrinsics: we specialize all the intrinsics to usize so that
 // we can specify them.

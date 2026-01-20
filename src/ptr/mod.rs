@@ -1,9 +1,6 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
-use creusot_std::
-    {ghost::perm::Perm,
-    std::ptr::PtrLive,
-prelude::*};
+use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
 mod const_ptr;
 mod mut_ptr;
 
@@ -78,7 +75,7 @@ pub trait PtrAddExt<T> {
 //     let new_addr = usize::wrapping_add(product, p.addr());
 //     *result != usize::MAX && new_addr % a == 0
 // })]
-#[trusted]
+#[trusted] // TODO
 pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // FIXME(#75598): Direct use of these intrinsics improves codegen significantly at opt-level <=
     // 1, where the method versions of these operations are not inlined.
@@ -103,7 +100,7 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // ∀d, d > 0 ∧ x % d = 0 ∧ m % d = 0 → d = 1
     // With this precondition, we can then write this postcondition to check the correctness of the answer:
     // #[safety::ensures(|result| wrapping_mul(*result, x) % m == 1)]
-    #[trusted]
+    #[trusted] // TODO
     #[inline]
     const unsafe fn mod_inv(x: usize, m: usize) -> usize {
         // /// Multiplicative modular inverse table modulo 2⁴ = 16.
@@ -269,7 +266,7 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 ///
 /// Specifying `ptr::swap` so that it allows overlapping pointers is future work.
 #[allow(unused_variables)]
-#[trusted]
+#[trusted] // TODO: verify swap?
 #[erasure(::std::ptr::swap)]
 #[requires(a as *const T == *perm.left().ward() && b as *const T == *perm.right().ward())]
 #[ensures((^perm.left()).ward() == perm.left().ward() && (^perm.left()).val() == perm.right().val())]
@@ -341,7 +338,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 }
 
 #[allow(unused_variables)]
-#[trusted]
+#[trusted] // Specify transmute
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
 #[requires(perm.len() % N@ == 0)]
@@ -354,7 +351,7 @@ pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*con
 }
 
 #[allow(unused_variables)]
-#[trusted]
+#[trusted] // Specify transmute
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
 #[requires(perm.len() % N@ == 0)]
@@ -365,6 +362,8 @@ pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*con
 #[ensures(perm.ward() == (^perm).ward())]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
     ==> (^result).val()@[i]@[j] == (^perm).val()@[i * N@ + j])]
-pub fn cast_array_perm_mut<const N: usize, T>(perm: &mut Perm<*const [T]>) -> &mut Perm<*const [[T; N]]> {
+pub fn cast_array_perm_mut<const N: usize, T>(
+    perm: &mut Perm<*const [T]>,
+) -> &mut Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }

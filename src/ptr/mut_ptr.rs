@@ -1,7 +1,7 @@
 use super::PtrAddExt;
 use crate::intrinsics::const_eval_select;
 use crate::ub_checks;
-use creusot_std::{std::ptr::PtrLive, prelude::*, std};
+use creusot_std::{prelude::*, std, std::ptr::PtrLive};
 
 impl<T> PtrAddExt<T> for *mut T {
     #[requires(live.contains(self as *const T))]
@@ -10,6 +10,7 @@ impl<T> PtrAddExt<T> for *mut T {
     #[erasure(<*mut T>::add)]
     unsafe fn add_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self {
         #[trusted]
+        // TODO
         // #[cfg(debug_assertions)]
         // #[inline]
         // #[rustc_allow_const_fn_unstable(const_eval_select)]
