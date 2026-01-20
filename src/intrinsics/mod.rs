@@ -4,6 +4,9 @@ use creusot_std::{ghost::perm::Perm, prelude::*};
 #[cfg(creusot)]
 use creusot_std::std::ptr::metadata_logic;
 
+// Intrinsics: we specialize all the intrinsics to usize so that
+// we can specify them.
+
 #[trusted]
 #[check(ghost_trusted)]
 #[erasure(::core::intrinsics::exact_div)]
@@ -13,24 +16,48 @@ pub const unsafe fn exact_div(x: usize, y: usize) -> usize {
     unsafe { ::core::intrinsics::exact_div(x, y) }
 }
 
-pub const unsafe fn cttz_nonzero<T: Copy>(x: T) -> u32 {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::cttz_nonzero)]
+#[requires(x@ != 0)]
+pub const unsafe fn cttz_nonzero(x: usize) -> u32 {
+    unsafe { ::core::intrinsics::cttz_nonzero(x) }
 }
 
-pub const fn mul_with_overflow<T: Copy>(x: T, y: T) -> (T, bool) {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::mul_with_overflow)]
+#[ensures(result.0@ == x@ * y@ % (usize::MAX@ + 1))]
+#[ensures(result.1 == (x@ * y@ <= usize::MAX@))]
+pub const fn mul_with_overflow(x: usize, y: usize) -> (usize, bool) {
+    ::core::intrinsics::mul_with_overflow(x, y)
 }
 
-pub const unsafe fn unchecked_rem<T: Copy>(x: T, y: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::unchecked_rem)]
+#[requires(y@ != 0)]
+#[ensures(result@ == x@ % y@)]
+pub const unsafe fn unchecked_rem(x: usize, y: usize) -> usize {
+    unsafe { ::core::intrinsics::unchecked_rem(x, y) }
 }
 
-pub const unsafe fn unchecked_shl<T: Copy, U: Copy>(x: T, y: U) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::unchecked_shl)]
+#[requires(y@ <= usize::BITS@)]
+#[ensures(result == x << y)]
+pub const unsafe fn unchecked_shl(x: usize, y: u32) -> usize {
+    unsafe { ::core::intrinsics::unchecked_shl(x, y) }
 }
 
-pub const unsafe fn unchecked_shr<T: Copy, U: Copy>(x: T, y: U) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::unchecked_shr)]
+#[requires(y@ <= usize::BITS@)]
+#[ensures(result == x >> y)]
+pub const unsafe fn unchecked_shr(x: usize, y: u32) -> usize {
+    unsafe { ::core::intrinsics::unchecked_shr(x, y) }
 }
 
 #[trusted]
@@ -42,16 +69,28 @@ pub const unsafe fn unchecked_sub(x: usize, y: usize) -> usize {
     unsafe { ::core::intrinsics::unchecked_sub(x, y) }
 }
 
-pub const fn wrapping_add<T: Copy>(a: T, b: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::wrapping_add)]
+#[ensures(result@ == a@ + b@ % (usize::MAX@ + 1))]
+pub const fn wrapping_add(a: usize, b: usize) -> usize {
+    ::core::intrinsics::wrapping_add(a, b)
 }
 
-pub const fn wrapping_mul<T: Copy>(a: T, b: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::wrapping_mul)]
+#[ensures(result@ == a@ * b@ % (usize::MAX@ + 1))]
+pub const fn wrapping_mul(a: usize, b: usize) -> usize {
+    ::core::intrinsics::wrapping_mul(a, b)
 }
 
-pub const fn wrapping_sub<T: Copy>(a: T, b: T) -> T {
-    panic!("intrinsics")
+#[trusted]
+#[check(ghost_trusted)]
+#[erasure(::core::intrinsics::wrapping_sub)]
+#[ensures(result@ == a@ - b@ % (usize::MAX@ + 1))]
+pub const fn wrapping_sub(a: usize, b: usize) -> usize {
+    ::core::intrinsics::wrapping_sub(a, b)
 }
 
 #[trusted]
