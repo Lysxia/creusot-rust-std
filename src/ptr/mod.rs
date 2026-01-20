@@ -23,7 +23,7 @@ pub trait PtrAddExt<T> {
     /// >   In particular, this range must not “wrap around” the edge of the address space.
     ///
     #[requires(false)]
-    unsafe fn add_live(self, offset: usize, own: Ghost<PtrLive<T>>) -> Self;
+    unsafe fn add_live(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
 }
 
 /// Align pointer `p`.
@@ -161,7 +161,7 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     if stride == 0 {
         // SPECIAL_CASE: handle 0-sized types. No matter how many times we step, the address will
         // stay the same, so no offset will be able to align the pointer unless it is already
-        // aligned. This branch _will_ be optimized out as `stride` is known at compile-time.
+        // aligned. This branch _will_ be optimized out as `stride` is knperm at compile-time.
         let p_mod_a = addr & a_minus_one;
         return if p_mod_a == 0 { 0 } else { usize::MAX };
     }
@@ -271,10 +271,10 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 #[allow(unused_variables)]
 #[trusted]
 #[erasure(::std::ptr::swap)]
-#[requires(a as *const T == *own.left().ward() && b as *const T == *own.right().ward())]
-#[ensures((^own.left()).ward() == own.left().ward() && (^own.left()).val() == own.right().val())]
-#[ensures((^own.right()).ward() == own.right().ward() && (^own.right()).val() == own.left().val())]
-pub unsafe fn swap_disjoint<T>(a: *mut T, b: *mut T, own: Ghost<DisjointOrEqual<T>>) {
+#[requires(a as *const T == *perm.left().ward() && b as *const T == *perm.right().ward())]
+#[ensures((^perm.left()).ward() == perm.left().ward() && (^perm.left()).val() == perm.right().val())]
+#[ensures((^perm.right()).ward() == perm.right().ward() && (^perm.right()).val() == perm.left().val())]
+pub unsafe fn swap_disjoint<T>(a: *mut T, b: *mut T, perm: Ghost<DisjointOrEqual<T>>) {
     // SAFETY: `a` and `b` are disjoint pointers, so this is safe.
     unsafe { ::std::ptr::swap(a, b) }
 }
@@ -344,12 +344,12 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 #[trusted]
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
-#[requires(own.len() % N@ == 0)]
-#[ensures(*result.ward() as *const T == *own.ward() as *const T)]
-#[ensures(result.len() == own.len() / N@)]
-#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
-    ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
-pub fn cast_array_perm<const N: usize, T>(own: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
+#[requires(perm.len() % N@ == 0)]
+#[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
+#[ensures(result.len() == perm.len() / N@)]
+#[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
+    ==> result.val()@[i]@[j] == perm.val()@[i * N@ + j])]
+pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }
 
@@ -357,14 +357,14 @@ pub fn cast_array_perm<const N: usize, T>(own: &Perm<*const [T]>) -> &Perm<*cons
 #[trusted]
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
-#[requires(own.len() % N@ == 0)]
-#[ensures(*result.ward() as *const T == *own.ward() as *const T)]
-#[ensures(result.len() == own.len() / N@)]
-#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
-    ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
-#[ensures(own.ward() == (^own).ward())]
-#[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
-    ==> (^result).val()@[i]@[j] == (^own).val()@[i * N@ + j])]
-pub fn cast_array_perm_mut<const N: usize, T>(own: &mut Perm<*const [T]>) -> &mut Perm<*const [[T; N]]> {
+#[requires(perm.len() % N@ == 0)]
+#[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
+#[ensures(result.len() == perm.len() / N@)]
+#[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
+    ==> result.val()@[i]@[j] == perm.val()@[i * N@ + j])]
+#[ensures(perm.ward() == (^perm).ward())]
+#[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
+    ==> (^result).val()@[i]@[j] == (^perm).val()@[i * N@ + j])]
+pub fn cast_array_perm_mut<const N: usize, T>(perm: &mut Perm<*const [T]>) -> &mut Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }

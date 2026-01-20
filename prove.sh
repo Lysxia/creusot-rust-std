@@ -13,10 +13,10 @@ TARGETS="\
   swap_unchecked \
   get_unchecked \
   get_unchecked_mut \
-  get_unchecked_own \
-  get_unchecked_mut_own \
-  from_raw_parts_own \
-  from_raw_parts_mut_own \
+  get_unchecked_perm \
+  get_unchecked_mut_perm \
+  from_raw_parts_perm \
+  from_raw_parts_mut_perm \
   left_mut_ghost \
   right_mut_ghost \
   left_ghost \

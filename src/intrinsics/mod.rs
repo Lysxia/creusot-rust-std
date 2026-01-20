@@ -74,27 +74,27 @@ pub unsafe fn slice_get_unchecked_mut<T>(slice: &mut [T], index: usize) -> &mut 
 
 #[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<*const T, *const [T], T>)]
-#[requires(*own.ward() == ptr)]
+#[requires(*perm.ward() == ptr)]
 #[requires(index < metadata_logic(ptr))]
 #[ensures(result == (ptr as *const T).offset_logic(index@))]
 pub unsafe fn slice_get_unchecked_raw<T>(
     ptr: *const [T],
     index: usize,
-    own: Ghost<&Perm<*const [T]>>,
+    perm: Ghost<&Perm<*const [T]>>,
 ) -> *const T {
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
 
-/// This only needs a `&PtrOwn` instead of `&mut PtrOwn` because it doesn't mutate anything.
+/// This only needs a `&Ptrperm` instead of `&mut Ptrperm` because it doesn't mutate anything.
 #[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<*mut T, *mut [T], T>)]
-#[requires(*own.ward() == ptr as *const [T])]
+#[requires(*perm.ward() == ptr as *const [T])]
 #[requires(index < metadata_logic(ptr))]
 #[ensures(result == (ptr as *const T).offset_logic(index@) as *mut T)]
 pub unsafe fn slice_get_unchecked_raw_mut<T>(
     ptr: *mut [T],
     index: usize,
-    own: Ghost<&Perm<*const [T]>>,
+    perm: Ghost<&Perm<*const [T]>>,
 ) -> *mut T {
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
