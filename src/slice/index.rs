@@ -13,12 +13,13 @@ use crate::ops;
 use core::ops::Bound;
 use core::range;
 #[cfg(creusot)]
-use creusot_contracts::std::ptr::metadata_logic;
-use creusot_contracts::{
-    ghost::{PtrLive, PtrOwn},
+use creusot_std::std::ptr::metadata_logic;
+use creusot_std::{
+    ghost::perm::Perm,
     prelude::*,
     std,
     std::ops::RangeBounds,
+    std::ptr::PtrLive,
 };
 
 // #[stable(feature = "rust1", since = "1.0.0")]
@@ -239,15 +240,15 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const T,
-        own: Ghost<&PtrOwn<T>>,
-    ) -> (*const Self::Output, Ghost<&PtrOwn<Self::Output>>);
+        perm: Ghost<&Perm<*const T>>,
+    ) -> (*const Self::Output, Ghost<&Perm<*const Self::Output>>);
 
     /// Returns a mutable pointer to the output at this location, without
     /// performing any bounds checking.
@@ -257,17 +258,17 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     ///
     /// [undefined behavior]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     // #[unstable(feature = "slice_index_methods", issue = "none")]
-    #[requires(own.ptr() == slice as *const T)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> own.ptr() == (^own).ptr() && self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const T)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures((^*result.1).ward() == result.1.ward() ==> perm.ward() == (^perm).ward() && self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut T,
-        own: Ghost<&mut PtrOwn<T>>,
-    ) -> (*mut Self::Output, Ghost<&mut PtrOwn<Self::Output>>);
+        perm: Ghost<&mut Perm<*const T>>,
+    ) -> (*mut Self::Output, Ghost<&mut Perm<*const Self::Output>>);
 
     /// Returns a shared reference to the output at this location, panicking
     /// if out of bounds.
@@ -339,15 +340,15 @@ unsafe impl<T> SliceIndex<[T]> for usize {
     }
 
     #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const T, Ghost<&PtrOwn<T>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const T, Ghost<&Perm<*const T>>) {
         assert_unsafe_precondition!(
             check_language_ub,
             "slice::get_unchecked requires that the index is within the slice",
@@ -362,27 +363,27 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             // Use intrinsics::assume instead of hint::assert_unchecked so that we don't check the
             // precondition of this function twice.
             core::intrinsics::assume(self < slice.len());
-            let ptr = slice_get_unchecked_raw(slice, self, own);
+            let ptr = slice_get_unchecked_raw(slice, self, perm);
             (
                 ptr,
-                ghost! { own.index(*Int::new(self as i128)) },
+                ghost! { perm.index(*Int::new(self as i128)) },
             )
         }
     }
 
     #[erasure(<usize as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const T == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const T == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut T, Ghost<&mut PtrOwn<T>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut T, Ghost<&mut Perm<*const T>>) {
         assert_unsafe_precondition!(
             check_library_ub,
             "slice::get_unchecked_mut requires that the index is within the slice",
@@ -391,10 +392,10 @@ unsafe impl<T> SliceIndex<[T]> for usize {
         );
         // SAFETY: see comments for `get_unchecked` above.
         unsafe {
-            let ptr = slice_get_unchecked_raw_mut(slice, self, ghost! { &**own });
+            let ptr = slice_get_unchecked_raw_mut(slice, self, ghost! { &**perm });
             (
                 ptr,
-                ghost! { own.into_inner().index_mut(*Int::new(self as i128)) },
+                ghost! { perm.into_inner().index_mut(*Int::new(self as i128)) },
             )
         }
     }
@@ -494,35 +495,35 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
 } */
 
 #[check(ghost)]
-#[requires(start <= end && end@ <= own.len())]
-#[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
-#[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
-fn ptr_own_slice<T>(own: Ghost<&PtrOwn<[T]>>, start: usize, end: usize) -> Ghost<&PtrOwn<[T]>> {
+#[requires(start <= end && end@ <= perm.len())]
+#[ensures(*result.ward() as *const T == (*perm.ward() as *const T).offset_logic(start@))]
+#[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
+fn ptr_perm_slice<T>(perm: Ghost<&Perm<*const [T]>>, start: usize, end: usize) -> Ghost<&Perm<*const [T]>> {
     ghost! {
-        let (own, _) = own.into_inner().split_at(*Int::new(end as i128));
-        let (_, own) = own.split_at(*Int::new(start as i128));
-        own
+        let (perm, _) = perm.into_inner().split_at(*Int::new(end as i128));
+        let (_, perm) = perm.split_at(*Int::new(start as i128));
+        perm
     }
 }
 
 #[check(ghost)]
-#[requires(start <= end && end@ <= own.len())]
-#[ensures(result.ptr() as *const T == (own.ptr() as *const T).offset_logic(start@))]
-#[ensures(result.val()@ == own.val()@.subsequence(start@, end@))]
-#[ensures(own.ptr() == (^own).ptr())]
-#[ensures((^result).val()@ == (^own).val()@.subsequence(start@, end@))]
-#[ensures(forall<i: Int> i < start@ || end@ <= i ==> own.val()@.get(i) == (^own).val()@.get(i))]
-fn ptr_own_slice_mut<T>(
-    own: Ghost<&mut PtrOwn<[T]>>,
+#[requires(start <= end && end@ <= perm.len())]
+#[ensures(*result.ward() as *const T == (*perm.ward() as *const T).offset_logic(start@))]
+#[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
+#[ensures(perm.ward() == (^perm).ward())]
+#[ensures((^result).val()@ == (^perm).val()@.subsequence(start@, end@))]
+#[ensures(forall<i: Int> 0 <= i && i < start@ || end@ <= i && i < perm.len() ==> perm.val()@[i] == (^perm).val()@[i])]
+fn ptr_perm_slice_mut<T>(
+    perm: Ghost<&mut Perm<*const [T]>>,
     start: usize,
     end: usize,
-) -> Ghost<&mut PtrOwn<[T]>> {
+) -> Ghost<&mut Perm<*const [T]>> {
     ghost! {
-        let _own0 = snapshot!{own};
-        let (own, _right) = own.into_inner().split_at_mut(*Int::new(end as i128));
-        proof_assert!{ resolve(_right) ==> forall<i: Int> end@ <= i ==> _own0.val()@.get(i) == (^_own0).val()@.get(i) }
-        let (_, own) = own.split_at_mut(*Int::new(start as i128));
-        own
+        let _perm0 = snapshot!{perm};
+        let (perm, _right) = perm.into_inner().split_at_mut(*Int::new(end as i128));
+        proof_assert!{ resolve(_right) ==> forall<i: Int> end@ <= i ==> _perm0.val()@.get(i) == (^_perm0).val()@.get(i) }
+        let (_, perm) = perm.split_at_mut(*Int::new(start as i128));
+        perm
     }
 }
 
@@ -562,12 +563,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         if let Some(new_len) = usize::checked_sub(self.end, self.start)
             && self.end <= slice.len()
         {
-            let (ptr, own) = PtrOwn::from_ref(slice);
+            let (ptr, perm) = Perm::from_ref(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
-                let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
-                Some(PtrOwn::as_ref(ptr, own))
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
+                let perm = ghost! { ptr_perm_slice(perm, self.start, self.end).into_inner() };
+                Some(Perm::as_ref(ptr, perm))
             }
         } else {
             None
@@ -584,13 +585,13 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         if let Some(new_len) = usize::checked_sub(self.end, self.start)
             && self.end <= slice.len()
         {
-            let (ptr, own) = PtrOwn::from_mut(slice);
+            let (ptr, perm) = Perm::from_mut(slice);
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
                 let ptr =
-                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
-                let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
-                Some(PtrOwn::as_mut(ptr, own))
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
+                let perm = ghost! { ptr_perm_slice_mut(perm, self.start, self.end).into_inner() };
+                Some(Perm::as_mut(ptr, perm))
             }
         } else {
             None
@@ -599,15 +600,15 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[inline]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         assert_unsafe_precondition!(
             check_library_ub,
             "slice::get_unchecked requires that the range is within the slice",
@@ -627,26 +628,26 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
             // Using the intrinsic avoids a superfluous UB check,
             // since the one on this method already checked `end >= start`.
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
-            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { own.live() });
-            let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
-            (ptr, own)
+            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { perm.live() });
+            let perm = ghost! { ptr_perm_slice(perm, self.start, self.end).into_inner() };
+            (ptr, perm)
         }
     }
 
     #[inline]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         assert_unsafe_precondition!(
             check_library_ub,
             "slice::get_unchecked_mut requires that the range is within the slice",
@@ -661,9 +662,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         unsafe {
             let new_len = crate::intrinsics::unchecked_sub(self.end, self.start);
             let ptr =
-                get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { own.live() });
-            let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
-            (ptr, own)
+                get_offset_len_mut_noubcheck(slice, self.start, new_len, ghost! { perm.live() });
+            let perm = ghost! { ptr_perm_slice_mut(perm, self.start, self.end).into_inner() };
+            (ptr, perm)
         }
     }
 
@@ -678,10 +679,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let (ptr, own) = PtrOwn::from_ref(slice);
-                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { own.live() });
-                let own = ghost! { ptr_own_slice(own, self.start, self.end).into_inner() };
-                PtrOwn::as_ref(ptr, own)
+                let (ptr, perm) = Perm::from_ref(slice);
+                let ptr = get_offset_len_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
+                let perm = ghost! { ptr_perm_slice(perm, self.start, self.end).into_inner() };
+                Perm::as_ref(ptr, perm)
             }
         } else {
             slice_index_fail(self.start, self.end, slice.len())
@@ -700,11 +701,11 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let (ptr, mut own) = PtrOwn::from_mut(slice);
+                let (ptr, mut perm) = Perm::from_mut(slice);
                 let ptr =
-                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost!{ own.live_mut().1 });
-                let own = ghost! { ptr_own_slice_mut(own, self.start, self.end).into_inner() };
-                PtrOwn::as_mut(ptr, own)
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost!{ perm.live_mut().1 });
+                let perm = ghost! { ptr_perm_slice_mut(perm, self.start, self.end).into_inner() };
+                Perm::as_mut(ptr, perm)
             }
         } else {
             slice_index_fail(self.start, self.end, slice.len())
@@ -756,35 +757,35 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
 
     #[inline]
     #[erasure(<core::range::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { ops::Range::from(self).get_unchecked_own(slice, own) }
+        unsafe { ops::Range::from(self).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<core::range::Range<usize> as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { ops::Range::from(self).get_unchecked_mut_own(slice, own) }
+        unsafe { ops::Range::from(self).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline(always)]
@@ -852,35 +853,35 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeTo<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (0..self.end).get_unchecked_own(slice, own) }
+        unsafe { (0..self.end).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (0..self.end).get_unchecked_mut_own(slice, own) }
+        unsafe { (0..self.end).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline(always)]
@@ -948,35 +949,35 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (self.start..slice.len()).get_unchecked_own(slice, own) }
+        unsafe { (self.start..slice.len()).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (self.start..slice.len()).get_unchecked_mut_own(slice, own) }
+        unsafe { (self.start..slice.len()).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline]
@@ -989,9 +990,15 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
         unsafe {
-            let (slice, own) = PtrOwn::from_ref(slice);
-            let (ptr, own) = self.get_unchecked_own(slice, own);
-            PtrOwn::as_ref(ptr, own)
+            let new_len = crate::intrinsics::unchecked_sub(slice.len(), self.start);
+            let (slice, perm) = Perm::from_ref(slice);
+            let ptr = get_offset_len_noubcheck(slice, self.start, new_len, ghost! { perm.live() });
+            let perm = ghost! {
+                let (_, perm) = perm.split_at(*Int::new(self.start as i128));
+                let (perm, _) = perm.split_at(*Int::new(new_len as i128));
+                perm
+            };
+            Perm::as_ref(ptr, perm)
         }
     }
 
@@ -1007,9 +1014,16 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
         }
         // SAFETY: `self` is checked to be valid and in bounds above.
         unsafe {
-            let (slice, own) = PtrOwn::from_mut(slice);
-            let (ptr, own) = self.get_unchecked_mut_own(slice, own);
-            PtrOwn::as_mut(ptr, own)
+            let new_len = crate::intrinsics::unchecked_sub(slice.len(), self.start);
+            let (slice, perm) = Perm::from_mut(slice);
+            let (perm, live) = ghost! { perm.into_inner().live_mut() }.split();
+            let ptr = get_offset_len_mut_noubcheck(slice, self.start, new_len, live);
+            let perm = ghost! {
+                let (_, perm) = perm.into_inner().split_at_mut(*Int::new(self.start as i128));
+                let (perm, _) = perm.split_at_mut(*Int::new(new_len as i128));
+                perm
+            };
+            Perm::as_mut(ptr, perm)
         }
     }
 }
@@ -1059,35 +1073,35 @@ unsafe impl<T> SliceIndex<[T]> for core::range::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { ops::RangeFrom::from(self).get_unchecked_own(slice, own) }
+        unsafe { ops::RangeFrom::from(self).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { ops::RangeFrom::from(self).get_unchecked_mut_own(slice, own) }
+        unsafe { ops::RangeFrom::from(self).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline]
@@ -1151,32 +1165,32 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFull {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
-        (slice, own)
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
+        (slice, perm)
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures((^*result.1).ptr() == result.1.ptr() ==> own.ptr() == (^own).ptr() && self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures((^*result.1).ward() == result.1.ward() ==> perm.ward() == (^perm).ward() && self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
-        (slice, own)
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
+        (slice, perm)
     }
 
     #[inline]
@@ -1252,38 +1266,38 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
     #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
         todo!() // private function
-        // unsafe { self.into_slice_range().get_unchecked_own(slice, own) }
+        // unsafe { self.into_slice_range().get_unchecked_perm(slice, perm) }
     }
 
     #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
         todo!() // private function
-        // unsafe { self.into_slice_range().get_unchecked_mut_own(slice, own) }
+        // unsafe { self.into_slice_range().get_unchecked_mut_perm(slice, perm) }
     }
 
     #[trusted] // TODO
@@ -1301,10 +1315,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         //     if let Some(new_len) = usize::checked_sub(end, start) {
         //         unsafe {
         //             // SAFETY: `self` is checked to be valid and in bounds above.
-        //             let (ptr, own) = PtrOwn::from_ref(slice);
-        //             let ptr = get_offset_len_noubcheck(ptr, start, new_len, ghost! { own.live() });
-        //             let own = ghost! { ptr_own_slice(own, self.start, self.end + 1).into_inner() };
-        //             return PtrOwn::as_ref(ptr, own)
+        //             let (ptr, perm) = Perm::from_ref(slice);
+        //             let ptr = get_offset_len_noubcheck(ptr, start, new_len, ghost! { perm.live() });
+        //             let perm = ghost! { ptr_perm_slice(perm, self.start, self.end + 1).into_inner() };
+        //             return Perm::as_ref(ptr, perm)
         //         }
         //     }
         // }
@@ -1328,10 +1342,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         //     if let Some(new_len) = usize::checked_sub(end, start) {
         //         // SAFETY: `self` is checked to be valid and in bounds above.
         //         unsafe {
-        //             let (ptr, own) = PtrOwn::from_mut(slice);
-        //             let ptr = get_offset_len_mut_noubcheck(ptr, start, new_len, ghost! { own.live() });
-        //             let own = ghost!{ ptr_own_slice_mut(own, self.start, self.end + 1).into_inner() };
-        //             return PtrOwn::as_mut(ptr, own)
+        //             let (ptr, perm) = Perm::from_mut(slice);
+        //             let ptr = get_offset_len_mut_noubcheck(ptr, start, new_len, ghost! { perm.live() });
+        //             let perm = ghost!{ ptr_perm_slice_mut(perm, self.start, self.end + 1).into_inner() };
+        //             return Perm::as_mut(ptr, perm)
         //         }
         //     }
         // }
@@ -1384,35 +1398,35 @@ unsafe impl<T> SliceIndex<[T]> for range::RangeInclusive<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { ops::RangeInclusive::from(self).get_unchecked_own(slice, own) }
+        unsafe { ops::RangeInclusive::from(self).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { ops::RangeInclusive::from(self).get_unchecked_mut_own(slice, own) }
+        unsafe { ops::RangeInclusive::from(self).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline]
@@ -1480,35 +1494,35 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { (0..=self.end).get_unchecked_own(slice, own) }
+        unsafe { (0..=self.end).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { (0..=self.end).get_unchecked_mut_own(slice, own) }
+        unsafe { (0..=self.end).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline]
@@ -1862,35 +1876,35 @@ unsafe impl<T> SliceIndex<[T]> for (ops::Bound<usize>, ops::Bound<usize>) {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
-    #[requires(own.ptr() == slice)]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    unsafe fn get_unchecked_own(
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
         self,
         slice: *const [T],
-        own: Ghost<&PtrOwn<[T]>>,
-    ) -> (*const [T], Ghost<&PtrOwn<[T]>>) {
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
-        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_own(slice, own) }
+        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_perm(slice, perm) }
     }
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)]
-    #[requires(own.ptr() == slice as *const [T])]
-    #[requires(self.in_bounds(*own.val()))]
-    #[ensures(result.0 as *const Self::Output == result.1.ptr())]
-    #[ensures(self.slice_index(*own.val(), *result.1.val()))]
-    #[ensures(own.ptr() == (^own).ptr())]
-    #[ensures(self.slice_index(*(^*own).val(), *(^*result.1).val()))]
-    #[ensures(self.resolve_elsewhere(*own.val(), *(^*own).val()))]
-    unsafe fn get_unchecked_mut_own(
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
         self,
         slice: *mut [T],
-        own: Ghost<&mut PtrOwn<[T]>>,
-    ) -> (*mut [T], Ghost<&mut PtrOwn<[T]>>) {
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
         // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
-        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_mut_own(slice, own) }
+        unsafe { into_range_unchecked(slice.len(), self).get_unchecked_mut_perm(slice, perm) }
     }
 
     #[inline]

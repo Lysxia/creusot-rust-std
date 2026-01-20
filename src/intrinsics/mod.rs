@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 pub use ::core::intrinsics::const_eval_select;
-use creusot_contracts::{ghost::PtrOwn, prelude::*};
+use creusot_std::{ghost::perm::Perm, prelude::*};
 #[cfg(creusot)]
-use creusot_contracts::std::ptr::metadata_logic;
+use creusot_std::std::ptr::metadata_logic;
 
 #[trusted]
 #[check(ghost_trusted)]
@@ -74,13 +74,13 @@ pub unsafe fn slice_get_unchecked_mut<T>(slice: &mut [T], index: usize) -> &mut 
 
 #[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<*const T, *const [T], T>)]
-#[requires(own.ptr() == ptr)]
+#[requires(*own.ward() == ptr)]
 #[requires(index < metadata_logic(ptr))]
 #[ensures(result == (ptr as *const T).offset_logic(index@))]
 pub unsafe fn slice_get_unchecked_raw<T>(
     ptr: *const [T],
     index: usize,
-    own: Ghost<&PtrOwn<[T]>>,
+    own: Ghost<&Perm<*const [T]>>,
 ) -> *const T {
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
@@ -88,13 +88,13 @@ pub unsafe fn slice_get_unchecked_raw<T>(
 /// This only needs a `&PtrOwn` instead of `&mut PtrOwn` because it doesn't mutate anything.
 #[trusted]
 #[erasure(core::intrinsics::slice_get_unchecked::<*mut T, *mut [T], T>)]
-#[requires(own.ptr() == ptr as *const [T])]
+#[requires(*own.ward() == ptr as *const [T])]
 #[requires(index < metadata_logic(ptr))]
 #[ensures(result == (ptr as *const T).offset_logic(index@) as *mut T)]
 pub unsafe fn slice_get_unchecked_raw_mut<T>(
     ptr: *mut [T],
     index: usize,
-    own: Ghost<&PtrOwn<[T]>>,
+    own: Ghost<&Perm<*const [T]>>,
 ) -> *mut T {
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }

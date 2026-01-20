@@ -9,9 +9,9 @@
 use crate::intrinsics::{exact_div, unchecked_sub};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
-use creusot_contracts::ghost::PtrOwn;
-use creusot_contracts::{
+use creusot_std::{
     prelude::{Clone, PartialEq, *},
+    ghost::perm::Perm,
     std::ops::RangeBounds,
 };
 // use core::num::NonZero;
@@ -61,23 +61,23 @@ pub use ascii::is_ascii_simple;
 //#[stable(feature = "slice_get_slice", since = "1.28.0")]
 use crate::slice::index::{SliceIndex, range};
 
-use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_own, from_raw_parts_own};
+use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_perm, from_raw_parts_perm};
 
 #[check(ghost)]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
-#[ensures(result.0.ptr() == (s.ptr() as *const T).offset_logic(i))]
-#[ensures(result.1.ptr() == (s.ptr() as *const T).offset_logic(j))]
+#[ensures(*result.0.ward() == (*s.ward() as *const T).offset_logic(i))]
+#[ensures(*result.1.ward() == (*s.ward() as *const T).offset_logic(j))]
 #[ensures(*result.0.val() == s.val()@[i])]
 #[ensures(*result.1.val() == s.val()@[j])]
 #[ensures(*(^(*result).0).val() == (^*s).val()@[i])]
 #[ensures(*(^(*result).1).val() == (^*s).val()@[j])]
-#[ensures((^*s).ptr() == s.ptr())]
+#[ensures((^*s).ward() == s.ward())]
 #[ensures(forall<k: Int> k != i && k != j ==> (^*s).val()@.get(k) == s.val()@.get(k))]
 pub fn block_get_2<T>(
-    s: Ghost<&mut PtrOwn<[T]>>,
+    s: Ghost<&mut Perm<*const [T]>>,
     i: Int,
     j: Int,
-) -> Ghost<(&mut PtrOwn<T>, &mut PtrOwn<T>)> {
+) -> Ghost<(&mut Perm<*const T>, &mut Perm<*const T>)> {
     ghost! {
         let _s = snapshot!(s);
         if i < j {
@@ -105,13 +105,13 @@ pub unsafe fn get_unchecked<T, I>(self_: &[T], index: I) -> &I::Output
 where
     I: SliceIndex<[T]>,
 {
-    let (ptr, owns) = PtrOwn::from_ref(self_);
+    let (ptr, perms) = Perm::from_ref(self_);
     // SAFETY: the caller must uphold most of the safety requirements for `get_unchecked`;
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
     unsafe {
-        let (ptr, own) = index.get_unchecked_own(ptr, owns);
-        PtrOwn::as_ref(ptr, own)
+        let (ptr, perm) = index.get_unchecked_perm(ptr, perms);
+        Perm::as_ref(ptr, perm)
     }
 }
 
@@ -125,13 +125,13 @@ where
     I: SliceIndex<[T]>,
 {
     proof_assert!(forall<p: *mut [T], q: *mut [T]> p.thin() == q.thin() && p.len_logic() == q.len_logic() ==> p == q);
-    let (ptr, owns) = PtrOwn::from_mut(self_);
+    let (ptr, perms) = Perm::from_mut(self_);
     // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
     unsafe {
-        let (ptr, own) = index.get_unchecked_mut_own(ptr, owns);
-        PtrOwn::as_mut(ptr, own)
+        let (ptr, perm) = index.get_unchecked_mut_perm(ptr, perms);
+        Perm::as_mut(ptr, perm)
     }
 }
 
@@ -152,23 +152,23 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
         ) => a < len && b < len,
     );
 
-    let (ptr, owns) = self_.as_mut_ptr_own();
-    let (mut owns, live) = ghost! { owns.into_inner().live_mut() }.split();
-    let own = ghost! {
+    let (ptr, perms) = self_.as_mut_ptr_perm();
+    let (mut perms, live) = ghost! { perms.into_inner().live_mut() }.split();
+    let perm = ghost! {
         if a == b {
             let a_ = Int::new(a as i128).into_inner();
-            vptr::DisjointOrEqual::Equal(owns.index_mut(a_))
+            vptr::DisjointOrEqual::Equal(perms.index_mut(a_))
         } else {
             let a_ = Int::new(a as i128).into_inner();
             let b_ = Int::new(b as i128).into_inner();
-            let (own_a, own_b) = block_get_2(owns, a_, b_).into_inner();
-            vptr::DisjointOrEqual::Disjoint(own_a, own_b)
+            let (perm_a, perm_b) = block_get_2(perms, a_, b_).into_inner();
+            vptr::DisjointOrEqual::Disjoint(perm_a, perm_b)
         }
     };
 
     // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
     unsafe {
-        vptr::swap_disjoint(ptr.add_live(a, live), ptr.add_live(b, live), own);
+        vptr::swap_disjoint(ptr.add_live(a, live), ptr.add_live(b, live), perm);
     }
 }
 
@@ -188,11 +188,11 @@ pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
     );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
-    let (ptr, own) = self_.as_ptr_own();
-    let own = ghost! { crate::ptr::cast_array_own(own.into_inner()) };
+    let (ptr, perm) = self_.as_ptr_perm();
+    let perm = ghost! { crate::ptr::cast_array_perm(perm.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
-    unsafe { from_raw_parts_own(ptr.cast(), new_len, own) }
+    unsafe { from_raw_parts_perm(ptr.cast(), new_len, perm) }
 }
 
 #[erasure(<[T]>::as_chunks_unchecked_mut::<N>)]
@@ -216,11 +216,11 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
     );
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
-    let (ptr, own) = self_.as_mut_ptr_own();
-    let own = ghost! { crate::ptr::cast_array_own_mut(own.into_inner()) };
+    let (ptr, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost! { crate::ptr::cast_array_perm_mut(perm.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
-    unsafe { from_raw_parts_mut_own((ptr as *mut T).cast(), new_len, own) }
+    unsafe { from_raw_parts_mut_perm((ptr as *mut T).cast(), new_len, perm) }
 }
 
 #[erasure(<[T]>::split_at)]
@@ -258,9 +258,9 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     // `(self.get_unchecked(..mid), self.get_unchecked(mid..))`
 
     let len = self_.len();
-    let (ptr, owns) = self_.as_ptr_own();
-    let (owns0, owns1) = ghost! {
-        owns.into_inner().split_at(*Int::new(mid as i128))
+    let (ptr, perms) = self_.as_ptr_perm();
+    let (perms0, perms1) = ghost! {
+        perms.into_inner().split_at(*Int::new(mid as i128))
     }
     .split();
     assert_unsafe_precondition!(
@@ -273,11 +273,11 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     // SAFETY: Caller has to check that `0 <= mid <= self.len()`
     unsafe {
         (
-            from_raw_parts_own(ptr, mid, owns0),
-            from_raw_parts_own(
-                ptr.add_live(mid, ghost! { owns0.live() }),
+            from_raw_parts_perm(ptr, mid, perms0),
+            from_raw_parts_perm(
+                ptr.add_live(mid, ghost! { perms0.live() }),
                 unchecked_sub(len, mid),
-                owns1,
+                perms1,
             ),
         )
     }
@@ -293,10 +293,10 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 #[ensures((^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@)]
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
-    let (ptr, owns) = self_.as_mut_ptr_own();
-    let (owns, live) = ghost! { owns.into_inner().live_mut() }.split();
-    let (owns0, owns1) = ghost! {
-        owns.into_inner().split_at_mut(*Int::new(mid as i128))
+    let (ptr, perms) = self_.as_mut_ptr_perm();
+    let (perms, live) = ghost! { perms.into_inner().live_mut() }.split();
+    let (perms0, perms1) = ghost! {
+        perms.into_inner().split_at_mut(*Int::new(mid as i128))
     }
     .split();
 
@@ -313,8 +313,8 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     // is fine.
     unsafe {
         (
-            from_raw_parts_mut_own(ptr, mid, owns0),
-            from_raw_parts_mut_own(ptr.add_live(mid, live), unchecked_sub(len, mid), owns1),
+            from_raw_parts_mut_perm(ptr, mid, perms0),
+            from_raw_parts_mut_perm(ptr.add_live(mid, live), unchecked_sub(len, mid), perms1),
         )
     }
 }
@@ -587,7 +587,7 @@ pub fn reverse<T>(self_: &mut [T]) {
         // Because this function is first compiled in isolation,
         // this check tells LLVM that the indexing below is
         // in-bounds. Then after inlining -- once the actual
-        // lengths of the slices are known -- it's removed.
+        // lengths of the slices are knperm -- it's removed.
         let (a, _) = a.split_at_mut(n);
         let (b, _) = b.split_at_mut(n);
 
@@ -610,10 +610,10 @@ pub fn reverse<T>(self_: &mut [T]) {
 /* pub const */
 pub fn as_chunks<T, const N: usize>(self_: &[T]) -> (&[[T; N]], &[T]) {
     assert!(N != 0, "chunk size must be non-zero");
-    let len_rounded_down = self_.len() / N * N;
-    // SAFETY: The rounded-down value is always the same or smaller than the
+    let len_rounded_dperm = self_.len() / N * N;
+    // SAFETY: The rounded-dperm value is always the same or smaller than the
     // original length, and thus must be in-bounds of the slice.
-    let (multiple_of_n, remainder) = unsafe { split_at_unchecked(self_, len_rounded_down) };
+    let (multiple_of_n, remainder) = unsafe { split_at_unchecked(self_, len_rounded_dperm) };
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
     let array_slice = unsafe { as_chunks_unchecked(multiple_of_n) };
@@ -663,10 +663,10 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
 /* pub const */
 pub fn as_chunks_mut<T, const N: usize>(self_: &mut [T]) -> (&mut [[T; N]], &mut [T]) {
     assert!(N != 0, "chunk size must be non-zero");
-    let len_rounded_down = self_.len() / N * N;
-    // SAFETY: The rounded-down value is always the same or smaller than the
+    let len_rounded_dperm = self_.len() / N * N;
+    // SAFETY: The rounded-dperm value is always the same or smaller than the
     // original length, and thus must be in-bounds of the slice.
-    let (multiple_of_n, remainder) = unsafe { split_at_mut_unchecked(self_, len_rounded_down) };
+    let (multiple_of_n, remainder) = unsafe { split_at_mut_unchecked(self_, len_rounded_dperm) };
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
     let array_slice = unsafe { as_chunks_unchecked_mut(multiple_of_n) };
@@ -747,7 +747,7 @@ where
 
         // This is imprecise in the case where `size` is odd and the
         // comparison returns Greater: the mid element still gets included
-        // by `size` even though it's known to be larger than the element
+        // by `size` even though it's knperm to be larger than the element
         // being searched for.
         //
         // This is fine though: we gain more performance by keeping the
@@ -1049,7 +1049,7 @@ where
             let idx = indices.get_unchecked(i).clone();
             arr_ptr.cast::<&mut I::Output>().add(i).write(
                 // &mut *slice.get_unchecked_mut(idx)
-                // &mut *idx.get_unchecked_mut_own(slice, todo!()),
+                // &mut *idx.get_unchecked_mut_perm(slice, todo!()),
                 todo!(),
             );
         }

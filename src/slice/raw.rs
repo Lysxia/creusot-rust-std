@@ -1,18 +1,18 @@
 use crate::ub_checks;
 use ::std::ptr;
-use creusot_contracts::{ghost::PtrOwn, prelude::*};
+use creusot_std::{ghost::perm::Perm, prelude::*};
 
-#[requires(own.ptr().thin() == data)]
-#[requires(len@ == own.len())]
-#[ensures(result@ == own.val()@)]
+#[requires(perm.ward().thin() == data)]
+#[requires(len@ == perm.len())]
+#[ensures(result@ == perm.val()@)]
 #[erasure(::std::slice::from_raw_parts)]
-pub unsafe fn from_raw_parts_own<'a, T>(
+pub unsafe fn from_raw_parts_perm<'a, T>(
     data: *const T,
     len: usize,
-    own: Ghost<&'a PtrOwn<[T]>>,
+    perm: Ghost<&'a Perm<*const [T]>>,
 ) -> &'a [T] {
     ghost! {
-        own.live();
+        perm.live();
         div_mono_lemma();
     };
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts`.
@@ -30,23 +30,23 @@ pub unsafe fn from_raw_parts_own<'a, T>(
             ub_checks::maybe_is_aligned_and_not_null(data, align, false)
                 && ub_checks::is_valid_allocation_size(size, len)
         );
-        PtrOwn::as_ref(std::ptr::slice_from_raw_parts(data, len), own)
+        Perm::as_ref(std::ptr::slice_from_raw_parts(data, len), perm)
     }
 }
 
-#[requires(own.ptr().thin() == data as *const T)]
-#[requires(len@ == own.len())]
-#[ensures(result@ == own.val()@)]
-#[ensures((^*own).ptr() == own.ptr())]
-#[ensures((^result)@ == (^*own).val()@)]
+#[requires(perm.ward().thin() == data as *const T)]
+#[requires(len@ == perm.len())]
+#[ensures(result@ == perm.val()@)]
+#[ensures((^*perm).ward() == perm.ward())]
+#[ensures((^result)@ == (^*perm).val()@)]
 #[erasure(::std::slice::from_raw_parts_mut)]
-pub unsafe fn from_raw_parts_mut_own<T>(
+pub unsafe fn from_raw_parts_mut_perm<T>(
     data: *mut T,
     len: usize,
-    own: Ghost<&mut PtrOwn<[T]>>,
+    perm: Ghost<&mut Perm<*const [T]>>,
 ) -> &mut [T] {
     ghost! {
-        own.live();
+        perm.live();
         div_mono_lemma();
     };
     // SAFETY: the caller must uphold the safety contract for `from_raw_parts_mut`.
@@ -64,7 +64,7 @@ pub unsafe fn from_raw_parts_mut_own<T>(
             ub_checks::maybe_is_aligned_and_not_null(data, align, false)
                 && ub_checks::is_valid_allocation_size(size, len)
         );
-        PtrOwn::as_mut(std::ptr::slice_from_raw_parts_mut(data, len), own)
+        Perm::as_mut(std::ptr::slice_from_raw_parts_mut(data, len), perm)
     }
 }
 
@@ -72,7 +72,7 @@ pub unsafe fn from_raw_parts_mut_own<T>(
 #[ensures(forall<a: Int, b: Int, d: Int> 0 <= a && 0 < d && a * d <= b ==> a <= b / d)]
 fn div_mono_lemma() {}
 
-/// Use `from_raw_parts_own` instead.
+/// Use `from_raw_parts_perm` instead.
 #[trusted]
 #[requires(false)]
 pub const unsafe fn from_raw_parts<'a, T>(data: *const T, len: usize) -> &'a [T] {
@@ -94,7 +94,7 @@ pub const unsafe fn from_raw_parts<'a, T>(data: *const T, len: usize) -> &'a [T]
     }
 }
 
-/// Use `from_raw_parts_mut_own` instead.
+/// Use `from_raw_parts_mut_perm` instead.
 #[trusted]
 #[requires(false)]
 pub const unsafe fn from_raw_parts_mut<'a, T>(data: *mut T, len: usize) -> &'a mut [T] {

@@ -1,5 +1,5 @@
 use crate::intrinsics::const_eval_select;
-use creusot_contracts::prelude::*;
+use creusot_std::prelude::*;
 
 #[macro_export]
 macro_rules! assert_unsafe_precondition {

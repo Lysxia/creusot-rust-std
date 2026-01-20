@@ -1,14 +1,15 @@
 use crate::intrinsics;
 use core::hint::assert_unchecked as assume;
-use creusot_contracts::ghost::{PtrLive, PtrOwn};
-use creusot_contracts::prelude::*;
-
+use creusot_std::
+    {ghost::perm::Perm,
+    std::ptr::PtrLive,
+prelude::*};
 mod const_ptr;
 mod mut_ptr;
 
 pub trait PtrAddExt<T> {
     /// Restriction of `add` that requires evidence that the addition is safe.
-    /// We simply require a borrow of the `PtrOwn<[T]>` token for the result pointer.
+    /// We simply require a borrow of the `Perm<*const [T]>` token for the result pointer.
     /// In particular, this accounts for one-past-the-end pointers, which point to a zero-sized slice.
     ///
     /// From https://doc.rust-lang.org/std/primitive.pointer.html#method.add:
@@ -270,22 +271,22 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 #[allow(unused_variables)]
 #[trusted]
 #[erasure(::std::ptr::swap)]
-#[requires(a as *const T == own.left().ptr() && b as *const T == own.right().ptr())]
-#[ensures((^own.left()).ptr() == own.left().ptr() && (^own.left()).val() == own.right().val())]
-#[ensures((^own.right()).ptr() == own.right().ptr() && (^own.right()).val() == own.left().val())]
+#[requires(a as *const T == *own.left().ward() && b as *const T == *own.right().ward())]
+#[ensures((^own.left()).ward() == own.left().ward() && (^own.left()).val() == own.right().val())]
+#[ensures((^own.right()).ward() == own.right().ward() && (^own.right()).val() == own.left().val())]
 pub unsafe fn swap_disjoint<T>(a: *mut T, b: *mut T, own: Ghost<DisjointOrEqual<T>>) {
     // SAFETY: `a` and `b` are disjoint pointers, so this is safe.
     unsafe { ::std::ptr::swap(a, b) }
 }
 
 pub enum DisjointOrEqual<'a, T> {
-    Equal(&'a mut PtrOwn<T>),
-    Disjoint(&'a mut PtrOwn<T>, &'a mut PtrOwn<T>),
+    Equal(&'a mut Perm<*const T>),
+    Disjoint(&'a mut Perm<*const T>, &'a mut Perm<*const T>),
 }
 
 impl<'a, T> DisjointOrEqual<'a, T> {
     #[logic(open)]
-    pub fn left(self) -> &'a mut PtrOwn<T> {
+    pub fn left(self) -> &'a mut Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(p, _) => p,
@@ -293,7 +294,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
     }
 
     #[logic(open)]
-    pub fn right(self) -> &'a mut PtrOwn<T> {
+    pub fn right(self) -> &'a mut Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(_, p) => p,
@@ -302,7 +303,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 
     #[check(ghost)]
     #[ensures(result == self.left())]
-    pub fn left_ghost(&self) -> &PtrOwn<T> {
+    pub fn left_ghost(&self) -> &Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(p, _) => p,
@@ -311,7 +312,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 
     #[check(ghost)]
     #[ensures(result == self.right())]
-    pub fn right_ghost(&self) -> &PtrOwn<T> {
+    pub fn right_ghost(&self) -> &Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(_, p) => p,
@@ -321,7 +322,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
     #[check(ghost)]
     #[ensures(*result == *self.left())]
     #[ensures(^result == *(^self).left())]
-    pub fn left_mut_ghost(&mut self) -> &mut PtrOwn<T> {
+    pub fn left_mut_ghost(&mut self) -> &mut Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(p, _) => p,
@@ -331,7 +332,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
     #[check(ghost)]
     #[ensures(*result == *self.right())]
     #[ensures(^result == *(^self).right())]
-    pub fn right_mut_ghost(&mut self) -> &mut PtrOwn<T> {
+    pub fn right_mut_ghost(&mut self) -> &mut Perm<*const T> {
         match self {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(_, p) => p,
@@ -344,11 +345,11 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
 #[requires(own.len() % N@ == 0)]
-#[ensures(result.ptr() as *const T == own.ptr() as *const T)]
+#[ensures(*result.ward() as *const T == *own.ward() as *const T)]
 #[ensures(result.len() == own.len() / N@)]
 #[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
     ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
-pub fn cast_array_own<const N: usize, T>(own: &PtrOwn<[T]>) -> &PtrOwn<[[T; N]]> {
+pub fn cast_array_perm<const N: usize, T>(own: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }
 
@@ -357,13 +358,13 @@ pub fn cast_array_own<const N: usize, T>(own: &PtrOwn<[T]>) -> &PtrOwn<[[T; N]]>
 #[check(ghost_trusted)]
 #[requires(0 < N@)]
 #[requires(own.len() % N@ == 0)]
-#[ensures(result.ptr() as *const T == own.ptr() as *const T)]
+#[ensures(*result.ward() as *const T == *own.ward() as *const T)]
 #[ensures(result.len() == own.len() / N@)]
 #[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
     ==> result.val()@[i]@[j] == own.val()@[i * N@ + j])]
-#[ensures(own.ptr() == (^own).ptr())]
+#[ensures(own.ward() == (^own).ward())]
 #[ensures(forall<i, j> 0 <= i && i < own.len() / N@ && 0 <= j && j < N@
     ==> (^result).val()@[i]@[j] == (^own).val()@[i * N@ + j])]
-pub fn cast_array_own_mut<const N: usize, T>(own: &mut PtrOwn<[T]>) -> &mut PtrOwn<[[T; N]]> {
+pub fn cast_array_perm_mut<const N: usize, T>(own: &mut Perm<*const [T]>) -> &mut Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }

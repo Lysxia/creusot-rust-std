@@ -1,4 +1,4 @@
-use creusot_contracts::prelude::*;
+use creusot_std::prelude::*;
 
 pub trait Index<Idx: ?Sized> {
     /// The returned type after indexing.
