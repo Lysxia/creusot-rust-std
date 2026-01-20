@@ -637,6 +637,7 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
     assert!(N != 0, "chunk size must be non-zero");
     let len = self_.len() / N;
     let (remainder, multiple_of_n) = split_at(self_, self_.len() - len * N);
+    let _mn = snapshot! { multiple_of_n@ };
     // SAFETY: We already panicked for zero, and ensured by construction
     // that the length of the subslice is a multiple of N.
     let array_slice = unsafe { as_chunks_unchecked(multiple_of_n) };
@@ -644,6 +645,8 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
         forall<i, j, len: Int> 0 <= i && i < len / N@ && 0 <= j && j < N@
         ==> len % N@ + i * N@ + j <= len % N@ + len / N@ * N@ - 1
     };
+    proof_assert! { forall<i, j> 0 <= i && i < len@ && 0 <= j && j < N@
+      ==> array_slice@[i]@[j] == _mn[i * N@ + j]};
     (remainder, array_slice)
 }
 

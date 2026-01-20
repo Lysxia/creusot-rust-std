@@ -512,7 +512,8 @@ fn ptr_perm_slice<T>(perm: Ghost<&Perm<*const [T]>>, start: usize, end: usize) -
 #[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
 #[ensures(perm.ward() == (^perm).ward())]
 #[ensures((^result).val()@ == (^perm).val()@.subsequence(start@, end@))]
-#[ensures(forall<i: Int> 0 <= i && i < start@ || end@ <= i && i < perm.len() ==> perm.val()@[i] == (^perm).val()@[i])]
+#[ensures(forall<i: Int> 0 <= i && i < start@ ==> perm.val()@[i] == (^perm).val()@[i])]
+#[ensures(forall<i: Int> end@ <= i && i < perm.len() ==> perm.val()@[i] == (^perm).val()@[i])]
 fn ptr_perm_slice_mut<T>(
     perm: Ghost<&mut Perm<*const [T]>>,
     start: usize,
