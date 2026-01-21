@@ -13,7 +13,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Clone Creusot source
-        run: git clone https://github.com/creusot-rs/creusot
+        run: |
+          cd ..
+          git clone https://github.com/creusot-rs/creusot --single-branch --branch ptr-slice-specs
 
       - name: Build
         run: cargo build
@@ -29,7 +31,9 @@ jobs:
           opam-pin: false
 
       - name: Clone Creusot source
-        run: git clone https://github.com/creusot-rs/creusot
+        run: |
+          cd ..
+          git clone https://github.com/creusot-rs/creusot --single-branch --branch ptr-slice-specs
 
       - name: Cache Creusot build
         uses: actions/cache@v4
@@ -41,10 +45,19 @@ jobs:
             ~/.local/share/creusot
           key: ${{ runner.os }}
 
+      - name: System dependencies
+        run: |
+          sudo apt update && sudo apt install opam libzmq3-dev
+          opam init --bare
+          opam --cli=2.1 var --global in-creusot-ci=true
+
       - name: Install Creusot
         run: |
-          cd creusot
+          cd ../creusot
           ./INSTALL
+
+      - name: Set up toolchain
+        run: rustup component add rust-src --toolchain nightly-2025-11-13
 
       - name: Run Creusot
         run: cargo creusot
