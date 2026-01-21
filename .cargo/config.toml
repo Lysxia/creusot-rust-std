@@ -1,2 +1,5 @@
 [unstable]
 build-std = ["core", "std"]
+
+[patch.crates-io]
+creusot-std = { path = "creusot/creusot-std" }
