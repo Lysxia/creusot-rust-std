@@ -267,13 +267,13 @@ pub(crate) unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
 /// Specifying `ptr::swap` so that it allows overlapping pointers is future work.
 #[allow(unused_variables)]
 #[trusted] // TODO: verify swap?
-#[erasure(::std::ptr::swap)]
+#[erasure(::core::ptr::swap)]
 #[requires(a as *const T == *perm.left().ward() && b as *const T == *perm.right().ward())]
 #[ensures((^perm.left()).ward() == perm.left().ward() && (^perm.left()).val() == perm.right().val())]
 #[ensures((^perm.right()).ward() == perm.right().ward() && (^perm.right()).val() == perm.left().val())]
 pub unsafe fn swap_disjoint<T>(a: *mut T, b: *mut T, perm: Ghost<DisjointOrEqual<T>>) {
     // SAFETY: `a` and `b` are disjoint pointers, so this is safe.
-    unsafe { ::std::ptr::swap(a, b) }
+    unsafe { ::core::ptr::swap(a, b) }
 }
 
 pub enum DisjointOrEqual<'a, T> {
