@@ -98,7 +98,7 @@ pub fn block_get_2<T>(
 //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
 //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
-// #[erasure(<[T]>::get_unchecked::<I>)]
+// #[erasure(<[T]>::get_unchecked::<I>)] TODO
 #[requires(index.in_bounds(*self_))]
 #[ensures(index.slice_index(*self_, *result))]
 pub unsafe fn get_unchecked<T, I>(self_: &[T], index: I) -> &I::Output
@@ -115,7 +115,7 @@ where
     }
 }
 
-// #[erasure(<[T]>::get_unchecked_mut::<I>)]
+// #[erasure(<[T]>::get_unchecked_mut::<I>)] TODO
 #[requires(index.in_bounds(*self_))]
 #[ensures(index.slice_index(*self_, *result))]
 #[ensures(index.slice_index(^self_, ^result))]
@@ -124,7 +124,6 @@ pub unsafe fn get_unchecked_mut<T, I>(self_: &mut [T], index: I) -> &mut I::Outp
 where
     I: SliceIndex<[T]>,
 {
-    proof_assert!(forall<p: *mut [T], q: *mut [T]> p.thin() == q.thin() && p.len_logic() == q.len_logic() ==> p == q);
     let (ptr, perms) = Perm::from_mut(self_);
     // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
     // the slice is dereferenceable because `self` is a safe reference.
