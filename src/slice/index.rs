@@ -1520,8 +1520,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
                     // SAFETY: `self` is checked to be valid and in bounds above.
                     let (ptr, perm) = Perm::from_ref(slice);
                     let ptr = get_offset_len_noubcheck(ptr, start, new_len, ghost! { perm.live() });
-                    let perm =
-                        ghost! { ptr_perm_slice(perm, start, end).into_inner() };
+                    let perm = ghost! { ptr_perm_slice(perm, start, end).into_inner() };
                     return Perm::as_ref(ptr, perm);
                 }
             }
@@ -1551,8 +1550,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
                     let (ptr, perm) = Perm::from_mut(slice);
                     let ptr =
                         get_offset_len_mut_noubcheck(ptr, start, new_len, ghost! { perm.live() });
-                    let perm =
-                        ghost! { ptr_perm_slice_mut(perm, start, end).into_inner() };
+                    let perm = ghost! { ptr_perm_slice_mut(perm, start, end).into_inner() };
                     return Perm::as_mut(ptr, perm);
                 }
             }
