@@ -110,7 +110,7 @@ unsafe fn get_offset_len_noubcheck<T>(
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
     let ptr = unsafe { std::intrinsics::add_live(ptr, offset, live) };
-    aggregate_raw_ptr_slice(ptr, len)
+    crate::intrinsics::aggregate_raw_ptr_slice(ptr, len)
 }
 
 #[inline(always)]
@@ -128,21 +128,7 @@ unsafe fn get_offset_len_mut_noubcheck<T>(
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
     let ptr = unsafe { std::intrinsics::add_live_mut(ptr, offset, live) };
-    aggregate_raw_ptr_mut_slice(ptr, len)
-}
-
-#[trusted] // Trusted intrinsic
-#[erasure(core::intrinsics::aggregate_raw_ptr::<*const [T], *const T, usize>)]
-#[ensures(result as *const T == ptr && metadata_logic(result) == len)]
-fn aggregate_raw_ptr_slice<T>(ptr: *const T, len: usize) -> *const [T] {
-    core::intrinsics::aggregate_raw_ptr(ptr, len)
-}
-
-#[trusted] // Trusted intrinsic
-#[erasure(core::intrinsics::aggregate_raw_ptr::<*mut [T], *mut T, usize>)]
-#[ensures(result as *mut T == ptr && metadata_logic(result) == len)]
-fn aggregate_raw_ptr_mut_slice<T>(ptr: *mut T, len: usize) -> *mut [T] {
-    core::intrinsics::aggregate_raw_ptr(ptr, len)
+    crate::intrinsics::aggregate_raw_ptr_mut_slice(ptr, len)
 }
 
 mod private_slice_index {

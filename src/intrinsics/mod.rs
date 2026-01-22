@@ -138,6 +138,20 @@ pub unsafe fn slice_get_unchecked_raw_mut<T>(
     unsafe { core::intrinsics::slice_get_unchecked(ptr, index) }
 }
 
+#[trusted]
+#[erasure(core::intrinsics::aggregate_raw_ptr::<*const [T], *const T, usize>)]
+#[ensures(result as *const T == ptr && metadata_logic(result) == len)]
+pub fn aggregate_raw_ptr_slice<T>(ptr: *const T, len: usize) -> *const [T] {
+    core::intrinsics::aggregate_raw_ptr(ptr, len)
+}
+
+#[trusted]
+#[erasure(core::intrinsics::aggregate_raw_ptr::<*mut [T], *mut T, usize>)]
+#[ensures(result as *mut T == ptr && metadata_logic(result) == len)]
+pub fn aggregate_raw_ptr_mut_slice<T>(ptr: *mut T, len: usize) -> *mut [T] {
+    core::intrinsics::aggregate_raw_ptr(ptr, len)
+}
+
 pub(crate) macro const_eval_select {
     (
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
