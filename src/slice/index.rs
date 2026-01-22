@@ -163,6 +163,7 @@ mod private_slice_index {
     impl Sealed for ops::RangeFull {}
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
     impl Sealed for ops::RangeInclusive<usize> {}
+    impl Sealed for super::RangeInclusive<usize> {}
     // #[stable(feature = "slice_get_slice", since = "1.28.0")]
     impl Sealed for ops::RangeToInclusive<usize> {}
     // #[stable(feature = "slice_index_with_ops_bound_pair", since = "1.53.0")]
@@ -1214,6 +1215,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFull {
     }
 }
 
+/// TRUSTED: This can't be verified directly because it uses private fields.
+/// We redefine `RangeInclusive` below and prove its `SliceIndex` impl.
+/// We still keep this impl because other types use it:
+/// 1. via the `..=` operator (cosmetic)
+/// 2. via the erasure check (that requires types to match exactly, for now)
+///
 /// The methods `index` and `index_mut` panic if:
 /// - the end of the range is `usize::MAX` or
 /// - the start of the range is greater than the end of the range or
@@ -1230,7 +1237,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start_log()@, self.end_log()@ + 1) }
+        pearlite! { res@ == slice@[self.start_log()@..self.end_log()@ + 1] }
     }
 
     #[logic(open, inline)]
@@ -1241,7 +1248,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         }
     }
 
-    #[trusted] // TODO
+    #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)]
     #[ensures(match result {
@@ -1253,7 +1260,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // if *self.end() == usize::MAX { None } else { self.into_slice_range().get(slice) }
     }
 
-    #[trusted] // TODO
+    #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)]
     #[ensures(match result {
@@ -1265,7 +1272,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // if *self.end() == usize::MAX { None } else { self.into_slice_range().get_mut(slice) }
     }
 
-    #[trusted] // TODO
+    #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)]
     #[requires(*perm.ward() == slice)]
@@ -1302,7 +1309,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // unsafe { self.into_slice_range().get_unchecked_mut_perm(slice, perm) }
     }
 
-    #[trusted] // TODO
+    #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
     #[requires(self.in_bounds(*slice))]
@@ -1327,7 +1334,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         // slice_index_fail(start, end, slice.len())
     }
 
-    #[trusted] // TODO
+    #[trusted]
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
     #[requires(self.in_bounds(*slice))]
@@ -1352,6 +1359,221 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeInclusive<usize> {
         //     }
         // }
         // slice_index_fail(start, end, slice.len())
+    }
+}
+
+pub struct RangeInclusive<Idx> {
+    pub(crate) start: Idx,
+    pub(crate) end: Idx,
+    pub(crate) exhausted: bool,
+}
+
+impl<Idx> RangeInclusive<Idx> {
+    #[ensures(true)]
+    pub fn new(start: Idx, end: Idx) -> Self {
+        Self {
+            start,
+            end,
+            exhausted: false,
+        }
+    }
+
+    #[logic(inline)]
+    pub fn start_log(self) -> Idx {
+        self.start
+    }
+
+    #[logic(inline)]
+    pub fn end_log(self) -> Idx {
+        self.end
+    }
+
+    #[ensures(*result == self.start_log())]
+    pub const fn start(&self) -> &Idx {
+        &self.start
+    }
+
+    #[ensures(*result == self.end_log())]
+    pub const fn end(&self) -> &Idx {
+        &self.end
+    }
+}
+
+impl RangeInclusive<usize> {
+    #[logic(inline)]
+    pub fn is_empty_log(self) -> bool {
+        self.exhausted || self.start > self.end
+    }
+
+    /// Converts to an exclusive `Range` for `SliceIndex` implementations.
+    /// The caller is responsible for dealing with `end == usize::MAX`.
+    #[inline]
+    #[requires(self.end_log() < usize::MAX)]
+    #[ensures(result.end@ == self.end@ + 1)]
+    #[ensures(result.start == if self.exhausted { result.end } else { self.start })]
+    pub(crate) const fn into_slice_range(self) -> ops::Range<usize> {
+        // If we're not exhausted, we want to simply slice `start..end + 1`.
+        // If we are exhausted, then slicing with `end + 1..end + 1` gives us an
+        // empty range that is still subject to bounds-checks for that endpoint.
+        let exclusive_end = self.end + 1;
+        let start = if self.exhausted {
+            exclusive_end
+        } else {
+            self.start
+        };
+        start..exclusive_end
+    }
+}
+
+/// The methods `index` and `index_mut` panic if:
+/// - the end of the range is `usize::MAX` or
+/// - the start of the range is greater than the end of the range or
+/// - the end of the range is out of bounds.
+// #[stable(feature = "inclusive_range", since = "1.26.0")]
+// #[rustc_const_unstable(feature = "const_index", issue = "143775")]
+unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
+    type Output = [T];
+
+    /// The actual definition of in_bounds depends on the private field `self.exhausted`.
+    /// We expose an underapproximation.
+    #[logic(inline)]
+    #[ensures(!self.is_empty_log() && self.start_log()@ <= self.end_log()@ && self.end_log()@ < slice@.len() ==> result)]
+    #[ensures(self.start_log()@ == self.end_log()@ + 1 && self.end_log()@ < slice@.len() ==> result)]
+    fn in_bounds(self, slice: [T]) -> bool {
+        pearlite! { self.exhausted && self.end_log()@ < slice@.len() || self.start_log()@ <= self.end_log()@ + 1 && self.end_log()@ < slice@.len() }
+    }
+
+    #[logic(open, inline)]
+    fn slice_index(self, slice: [T], res: [T]) -> bool {
+        pearlite! { res@ == if self.is_empty_log() { Seq::empty() } else { slice@[self.start_log()@..self.end_log()@ + 1] } }
+    }
+
+    #[logic(open, inline)]
+    fn resolve_elsewhere(self, old: [T], fin: [T]) -> bool {
+        pearlite! {
+            old@.len() == fin@.len()
+            && forall<i: Int> self.is_empty_log() || i < self.start_log()@ || self.end_log()@ < i ==> old@.get(i) == fin@.get(i)
+        }
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::get)] // TODO
+    #[ensures(match result {
+        None => !self.in_bounds(*slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result),
+    })]
+    fn get(self, slice: &[T]) -> Option<&[T]> {
+        if *self.end() == usize::MAX {
+            None
+        } else {
+            self.into_slice_range().get(slice)
+        }
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_mut)] // TODO
+    #[ensures(match result {
+        None => !self.in_bounds(*slice) && resolve(slice),
+        Some(result) => self.in_bounds(*slice) && self.slice_index(*slice, *result) && self.slice_index(^slice, ^result) && self.resolve_elsewhere(*slice, ^slice),
+    })]
+    fn get_mut(self, slice: &mut [T]) -> Option<&mut [T]> {
+        if *self.end() == usize::MAX {
+            None
+        } else {
+            self.into_slice_range().get_mut(slice)
+        }
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked)] // TODO
+    #[requires(*perm.ward() == slice)]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    unsafe fn get_unchecked_perm(
+        self,
+        slice: *const [T],
+        perm: Ghost<&Perm<*const [T]>>,
+    ) -> (*const [T], Ghost<&Perm<*const [T]>>) {
+        // SAFETY: the caller has to uphold the safety contract for `get_unchecked`.
+        unsafe { self.into_slice_range().get_unchecked_perm(slice, perm) }
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::get_unchecked_mut)] // TODO
+    #[requires(*perm.ward() == slice as *const [T])]
+    #[requires(self.in_bounds(*perm.val()))]
+    #[ensures(result.0 as *const Self::Output == *result.1.ward())]
+    #[ensures(self.slice_index(*perm.val(), *result.1.val()))]
+    #[ensures(perm.ward() == (^perm).ward())]
+    #[ensures(self.slice_index(*(^*perm).val(), *(^*result.1).val()))]
+    #[ensures(self.resolve_elsewhere(*perm.val(), *(^*perm).val()))]
+    unsafe fn get_unchecked_mut_perm(
+        self,
+        slice: *mut [T],
+        perm: Ghost<&mut Perm<*const [T]>>,
+    ) -> (*mut [T], Ghost<&mut Perm<*const [T]>>) {
+        // SAFETY: the caller has to uphold the safety contract for `get_unchecked_mut`.
+        unsafe { self.into_slice_range().get_unchecked_mut_perm(slice, perm) }
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)] // TODO
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    fn index(self, slice: &[T]) -> &[T] {
+        let Self {
+            mut start,
+            mut end,
+            exhausted,
+        } = self;
+        let len = slice.len();
+        if end < len {
+            end = end + 1;
+            start = if exhausted { end } else { start };
+            if let Some(new_len) = usize::checked_sub(end, start) {
+                unsafe {
+                    // SAFETY: `self` is checked to be valid and in bounds above.
+                    let (ptr, perm) = Perm::from_ref(slice);
+                    let ptr = get_offset_len_noubcheck(ptr, start, new_len, ghost! { perm.live() });
+                    let perm =
+                        ghost! { ptr_perm_slice(perm, start, end).into_inner() };
+                    return Perm::as_ref(ptr, perm);
+                }
+            }
+        }
+        slice_index_fail(start, end, slice.len())
+    }
+
+    #[inline]
+    // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)] // TODO
+    #[requires(self.in_bounds(*slice))]
+    #[ensures(self.slice_index(*slice, *result))]
+    #[ensures(self.slice_index(^slice, ^result))]
+    #[ensures(self.resolve_elsewhere(*slice, ^slice))]
+    fn index_mut(self, slice: &mut [T]) -> &mut [T] {
+        let Self {
+            mut start,
+            mut end,
+            exhausted,
+        } = self;
+        let len = slice.len();
+        if end < len {
+            end = end + 1;
+            start = if exhausted { end } else { start };
+            if let Some(new_len) = usize::checked_sub(end, start) {
+                // SAFETY: `self` is checked to be valid and in bounds above.
+                unsafe {
+                    let (ptr, perm) = Perm::from_mut(slice);
+                    let ptr =
+                        get_offset_len_mut_noubcheck(ptr, start, new_len, ghost! { perm.live() });
+                    let perm =
+                        ghost! { ptr_perm_slice_mut(perm, start, end).into_inner() };
+                    return Perm::as_mut(ptr, perm);
+                }
+            }
+        }
+        slice_index_fail(start, end, slice.len())
     }
 }
 

@@ -8,8 +8,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 
 | Function | Proof status | Notable trusted primitives and comments |
 |-|-|-|
-| get_unchecked | 🔧 | `aggregate_raw_ptr_slice`; TODO: `SliceIndex for ops::RangeInclusive` |
-| get_unchecked_mut | 🔧 | `aggregate_raw_ptr_slice`; TODO: `SliceIndex for ops::RangeInclusive` |
+| get_unchecked | ✅ | `aggregate_raw_ptr_slice` |
+| get_unchecked_mut | ✅ | `aggregate_raw_ptr_slice` |
 | swap_unchecked | ✅ | `::core::ptr::swap` (`swap_disjoint`) |
 | as_chunks_unchecked | ✅ | `cast_array_perm` (ad hoc axiomatization of pointer cast) |
 | as_chunks_unchecked_mut | ✅ | `cast_array_perm_mut` |
