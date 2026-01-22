@@ -12,8 +12,6 @@ use crate::ops;
 #[cfg(creusot)]
 use core::ops::Bound;
 use core::range;
-#[cfg(creusot)]
-use creusot_std::std::ptr::metadata_logic;
 use creusot_std::{ghost::perm::Perm, prelude::*, std, std::ops::RangeBounds, std::ptr::PtrLive};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
