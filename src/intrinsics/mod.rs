@@ -71,6 +71,15 @@ pub const unsafe fn unchecked_sub(x: usize, y: usize) -> usize {
 
 #[trusted]
 #[check(ghost_trusted)]
+#[erasure(::core::intrinsics::unchecked_sub)]
+#[requires(isize::MIN@ <= x@ - y@ && x@ - y@ <= isize::MAX@)]
+#[ensures(result@ == x@ - y@)]
+pub const unsafe fn unchecked_sub_isize(x: isize, y: isize) -> isize {
+    unsafe { ::core::intrinsics::unchecked_sub(x, y) }
+}
+
+#[trusted]
+#[check(ghost_trusted)]
 #[erasure(::core::intrinsics::wrapping_add)]
 #[ensures(result@ == a@ + b@ % (usize::MAX@ + 1))]
 pub const fn wrapping_add(a: usize, b: usize) -> usize {

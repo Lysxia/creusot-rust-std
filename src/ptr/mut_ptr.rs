@@ -1,18 +1,18 @@
 use super::PtrAddExt;
 use crate::intrinsics::const_eval_select;
 use crate::ub_checks;
+use core::mem::SizedTypeProperties;
 use creusot_std::{prelude::*, std, std::ptr::PtrLive};
 
 impl<T> PtrAddExt<T> for *mut T {
-    #[requires(live.contains(self as *const T))]
-    #[requires(live.contains((self as *const T).offset_logic(count@)))]
+    #[requires(count == 0usize || live.contains(self as *const T) && live.contains((self as *const T).offset_logic(count@)))]
     #[ensures(result as *const T == (self as *const T).offset_logic(count@))]
     #[erasure(<*mut T>::add)]
     unsafe fn add_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self {
         #[trusted]
         // TODO
         // #[cfg(debug_assertions)]
-        // #[inline]
+        #[inline]
         // #[rustc_allow_const_fn_unstable(const_eval_select)]
         #[ensures(result == (count@ * size@ <= isize::MAX@ && this.addr_logic()@ + count@ * size@ <= usize::MAX@))]
         const fn runtime_add_nowrap(this: *const (), count: usize, size: usize) -> bool {
@@ -44,5 +44,63 @@ impl<T> PtrAddExt<T> for *mut T {
 
         // SAFETY: the caller must uphold the safety contract for `offset`.
         unsafe { std::intrinsics::add_live_mut(self, count, live) }
+    }
+
+    /// It would be more general to add `count == 0usize || ...` to the `requires`,
+    /// but it breaks some proofs in `reverse`.
+    #[requires(live.contains(self as *const T) && live.contains((self as *const T).offset_logic(- count@)))]
+    #[ensures(result as *const T == (self as *const T).offset_logic(- count@))]
+    #[erasure(<*mut T>::sub)]
+    /* pub const */
+    unsafe fn sub_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self
+    where
+        T: Sized,
+    {
+        #[trusted]
+        // #[cfg(debug_assertions)]
+        #[inline]
+        //#[rustc_allow_const_fn_unstable(const_eval_select)]
+        #[ensures(result == (count@ * size@ <= isize::MAX@ && this.addr_logic()@ >= count@ * size@))]
+        const fn runtime_sub_nowrap(this: *const (), count: usize, size: usize) -> bool {
+            const_eval_select!(
+                @capture { this: *const (), count: usize, size: usize } -> bool:
+                if const {
+                    true
+                } else {
+                    let Some(byte_offset) = count.checked_mul(size) else {
+                        return false;
+                    };
+                    byte_offset <= (isize::MAX as usize) && this.addr() >= byte_offset
+                }
+            )
+        }
+
+        #[cfg(debug_assertions)] // Expensive, and doesn't catch much in the wild.
+        ub_checks::assert_unsafe_precondition!(
+            check_language_ub,
+            "ptr::sub requires that the address calculation does not overflow",
+            pearlite! { count@ * size@ <= isize::MAX@ && this.addr_logic()@ >= count@ * size@ },
+            (
+                this: *const () = self as *const (),
+                count: usize = count,
+                size: usize = size_of::<T>(),
+            ) => runtime_sub_nowrap(this, count, size)
+        );
+
+        if T::IS_ZST {
+            // Pointer arithmetic does nothing when the pointee is a ZST.
+            self
+        } else {
+            // SAFETY: the caller must uphold the safety contract for `offset`.
+            // Because the pointee is *not* a ZST, that means that `count` is
+            // at most `isize::MAX`, and thus the negation cannot overflow.
+            unsafe {
+                std::intrinsics::offset_live_mut(
+                    self,
+                    crate::intrinsics::unchecked_sub_isize(0, count as isize),
+                    live,
+                )
+            }
+        }
     }
 }

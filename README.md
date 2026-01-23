@@ -31,7 +31,7 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | split_last_chunk_mut | ❌ | |
 | last_chunk | ❌ | |
 | last_chunk_mut | ❌ | |
-| reverse | ❌ | |
+| reverse | ✅ | |
 | as_chunks | ✅ | |
 | as_chunks_mut | ✅ | |
 | as_rchunks | ✅ | |
