@@ -552,11 +552,37 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
     Some(unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) })
 }
 
-#[trusted] // TODO
+#[ensures(*(*result.1).val() == *self_)]
+#[ensures(*(^result.1).val() == ^self_)]
+#[ensures(result.0.start as *const T == result.1.ward().thin())]
+#[ensures(result.0.end as *const T == result.0.start.offset_logic(result.1.len()))]
+// #[erasure(<[T]>::as_mut_ptr_range)] // TODO: self.len() is called later in core (in start.add(...)), for now...
+/* pub const */
+pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*const [T]>>) {
+    let len = self_.len(); // Get the length before borrowing `self_`
+    let (start, perm) = self_.as_mut_ptr_perm();
+    // SAFETY: See as_ptr_range() above for why `add` here is safe.
+    let end = unsafe { start.add_live(len, ghost! { perm.live() }) };
+    (start..end, perm)
+}
+
+// #[erasure(<[T]>::reverse)] // TODO: (1) Unsupported a[i], (2) lift self.len() to the front
+#[ensures((^self_)@ == self_@.reverse())]
 /* pub const */
 pub fn reverse<T>(self_: &mut [T]) {
-    let half_len = self_.len() / 2;
-    let Range { start, end } = self_.as_mut_ptr_range();
+    let _old = snapshot! { self_@ };
+    let len = self_.len();
+    let half_len = len / 2;
+    let (Range { start, end }, perm) = as_mut_ptr_range(self_);
+    let (perm1, perm2) = ghost! {
+        perm.into_inner().split_at_mut(*Int::new(half_len as i128))
+    }
+    .split();
+    let perm2 = ghost! {
+        let i = *Int::new((len - 2 * half_len) as i128);
+        perm2.into_inner().split_at_mut(i).1
+    };
+    proof_assert! { perm2.ward().thin().offset_logic(half_len@) == end as *const T };
 
     // These slices will skip the middle item for an odd length,
     // since that one doesn't need to move.
@@ -566,10 +592,16 @@ pub fn reverse<T>(self_: &mut [T]) {
         // half (or less) of the original slice.
         unsafe {
             (
-                raw::from_raw_parts_mut(start, half_len),
-                raw::from_raw_parts_mut(end.sub(half_len), half_len),
+                raw::from_raw_parts_mut_perm(start, half_len, perm1),
+                raw::from_raw_parts_mut_perm(end.sub_live(half_len, ghost! { perm2.live() }), half_len, perm2),
             )
         };
+
+    proof_assert! { *_old == front_half@.concat(_old[half_len@..len@ - half_len@]).concat(back_half@) };
+    proof_assert! { len@ - 2 * half_len@ == 0 || len@ - 2 * half_len@ == 1 };
+    proof_assert! { _old[half_len@ .. len@ - half_len@].reverse() == _old[half_len@ .. len@ - half_len@] };
+    ghost! { reverse_concat::<T>() };
+    proof_assert! { (*_old).reverse() == back_half@.reverse().concat(_old[half_len@..len@ - half_len@]).concat(front_half@.reverse()) };
 
     // Introducing a function boundary here means that the two halves
     // get `noalias` markers, allowing better optimization as LLVM
@@ -577,24 +609,67 @@ pub fn reverse<T>(self_: &mut [T]) {
     revswap(front_half, back_half, half_len);
 
     #[inline]
-    const fn revswap<T>(a: &mut [T], b: &mut [T], n: usize) {
+    #[requires(n@ == a@.len() && n@ == b@.len())]
+    #[ensures((^a)@ == (*b)@.reverse())]
+    #[ensures((^b)@ == (*a)@.reverse())]
+    /* const */
+    fn revswap<T>(a: &mut [T], b: &mut [T], n: usize) {
         debug_assert!(a.len() == n);
         debug_assert!(b.len() == n);
+
+        let _a: Snapshot<Seq<T>> = snapshot! { a@ };
+        let _b: Snapshot<Seq<T>> = snapshot! { b@ };
 
         // Because this function is first compiled in isolation,
         // this check tells LLVM that the indexing below is
         // in-bounds. Then after inlining -- once the actual
-        // lengths of the slices are knperm -- it's removed.
+        // lengths of the slices are known -- it's removed.
         let (a, _) = a.split_at_mut(n);
         let (b, _) = b.split_at_mut(n);
 
+        proof_assert! { forall<s: Seq<T>> s[0..] == s };
+
         let mut i = 0;
+        #[invariant(n@ == a@.len() && n@ == b@.len())]
+        #[invariant(i <= n)]
+        #[invariant(a@ == _b[(n@ - i@)..].reverse().concat(_a[i@..]))]
+        #[invariant(b@ == _b[..(n@ - i@)].concat(_a[..i@].reverse()))]
         while i < n {
             mem::swap(&mut a[i], &mut b[n - 1 - i]);
+            proof_assert! { a@ == _b[(n@-i@)..].reverse().push_back(_b[n@-1-i@]).concat(_a[i@+1..]) };
+            proof_assert! { b@ == _b[..(n@-1-i@)].push_back(_a[i@]).concat(_a[..i@].reverse()) };
+            ghost! { reverse_push::<T>() };
+            ghost! { concat_push::<T>() };
+            ghost! { snoc_prefix::<T>()};
+            ghost! { cons_suffix_of(_b, *Int::new((n-i) as i128)) };
             i += 1;
         }
     }
 }
+
+#[check(ghost)]
+#[ensures(forall<a: Seq<T>, b> a.concat(b).reverse() == b.reverse().concat(a.reverse()))]
+fn reverse_concat<T>() {}
+
+#[check(ghost)]
+#[ensures(forall<s: Seq<T>, x> s.push_front(x).reverse() == s.reverse().push_back(x))]
+#[ensures(forall<s: Seq<T>, x> s.push_back(x).reverse() == s.reverse().push_front(x))]
+fn reverse_push<T>() {}
+
+#[check(ghost)]
+#[ensures(forall<s: Seq<T>, x, t: Seq<T>> s.concat(t.push_front(x)) == s.push_back(x).concat(t))]
+fn concat_push<T>() {}
+
+#[check(ghost)]
+#[requires(0 < i && i <= b.len())]
+#[ensures(b[i-1..] == b[i..].push_front(b[i-1]))]
+fn cons_suffix_of<T>(b: Snapshot<Seq<T>>, i: Int) {
+    let _ = (b, i);
+}
+
+#[check(ghost)]
+#[ensures(forall<a: Seq<T>, i> 0 <= i && i < a.len() ==> a[..i+1] == a[..i].push_back(a[i]))]
+fn snoc_prefix<T>() {}
 
 #[erasure(<[T]>::as_chunks::<N>)]
 #[requires(N@ != 0)]

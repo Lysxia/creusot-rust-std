@@ -21,6 +21,9 @@ pub trait PtrAddExt<T> {
     ///
     #[requires(false)]
     unsafe fn add_live(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
+
+    #[requires(false)]
+    unsafe fn sub_live(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
 }
 
 /// Align pointer `p`.
