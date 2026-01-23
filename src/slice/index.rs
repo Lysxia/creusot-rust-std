@@ -1199,6 +1199,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFull {
     }
 }
 
+#[allow(unused)]
 /// TRUSTED: This can't be verified directly because it uses private fields.
 /// We redefine `RangeInclusive` below and prove its `SliceIndex` impl.
 /// We still keep this impl because other types use it:
