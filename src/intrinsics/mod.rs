@@ -45,7 +45,7 @@ pub const unsafe fn unchecked_rem(x: usize, y: usize) -> usize {
 #[trusted]
 #[check(ghost_trusted)]
 #[erasure(::core::intrinsics::unchecked_shl)]
-#[requires(y@ <= usize::BITS@)]
+#[requires(y@ < usize::BITS@)]
 #[ensures(result == x << y)]
 pub const unsafe fn unchecked_shl(x: usize, y: u32) -> usize {
     unsafe { ::core::intrinsics::unchecked_shl(x, y) }
@@ -54,7 +54,7 @@ pub const unsafe fn unchecked_shl(x: usize, y: u32) -> usize {
 #[trusted]
 #[check(ghost_trusted)]
 #[erasure(::core::intrinsics::unchecked_shr)]
-#[requires(y@ <= usize::BITS@)]
+#[requires(y@ < usize::BITS@)]
 #[ensures(result == x >> y)]
 pub const unsafe fn unchecked_shr(x: usize, y: u32) -> usize {
     unsafe { ::core::intrinsics::unchecked_shr(x, y) }
