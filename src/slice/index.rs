@@ -473,7 +473,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
 #[check(ghost)]
 #[requires(start <= end && end@ <= perm.len())]
 #[ensures(*result.ward() as *const T == (*perm.ward() as *const T).offset_logic(start@))]
-#[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
+#[ensures(result.val()@ == perm.val()@[start@..end@])]
 fn ptr_perm_slice<T>(
     perm: Ghost<&Perm<*const [T]>>,
     start: usize,
@@ -489,9 +489,9 @@ fn ptr_perm_slice<T>(
 #[check(ghost)]
 #[requires(start <= end && end@ <= perm.len())]
 #[ensures(*result.ward() as *const T == (*perm.ward() as *const T).offset_logic(start@))]
-#[ensures(result.val()@ == perm.val()@.subsequence(start@, end@))]
+#[ensures(result.val()@ == perm.val()@[start@..end@])]
 #[ensures(perm.ward() == (^perm).ward())]
-#[ensures((^result).val()@ == (^perm).val()@.subsequence(start@, end@))]
+#[ensures((^result).val()@ == (^perm).val()@[start@..end@])]
 #[ensures(forall<i: Int> 0 <= i && i < start@ ==> perm.val()@[i] == (^perm).val()@[i])]
 #[ensures(forall<i: Int> end@ <= i && i < perm.len() ==> perm.val()@[i] == (^perm).val()@[i])]
 fn ptr_perm_slice_mut<T>(
@@ -522,7 +522,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start@, self.end@) }
+        pearlite! { res@ == slice@[self.start@..self.end@] }
     }
 
     #[logic(open, inline)]
@@ -711,7 +711,7 @@ unsafe impl<T> SliceIndex<[T]> for core::range::Range<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start@, self.end@) }
+        pearlite! { res@ == slice@[self.start@..self.end@] }
     }
 
     #[logic(open, inline)]
@@ -807,7 +807,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeTo<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(0, self.end@) }
+        pearlite! { res@ == slice@[0..self.end@] }
     }
 
     #[logic(open, inline)]
@@ -903,7 +903,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start@, slice@.len()) }
+        pearlite! { res@ == slice@[self.start@..slice@.len()] }
     }
 
     #[logic(open, inline)]
@@ -1027,7 +1027,7 @@ unsafe impl<T> SliceIndex<[T]> for core::range::RangeFrom<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start@, slice@.len()) }
+        pearlite! { res@ == slice@[self.start@..slice@.len()] }
     }
 
     #[logic(open, inline)]
@@ -1572,7 +1572,7 @@ unsafe impl<T> SliceIndex<[T]> for range::RangeInclusive<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(self.start@, self.last@ + 1) }
+        pearlite! { res@ == slice@[self.start@..self.last@ + 1] }
     }
 
     #[logic(open, inline)]
@@ -1668,7 +1668,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(0, self.end@ + 1) }
+        pearlite! { res@ == slice@[0..self.end@ + 1] }
     }
 
     #[logic(open, inline)]
@@ -2049,7 +2049,7 @@ unsafe impl<T> SliceIndex<[T]> for (ops::Bound<usize>, ops::Bound<usize>) {
 
     #[logic(open, inline)]
     fn slice_index(self, slice: [T], res: [T]) -> bool {
-        pearlite! { res@ == slice@.subsequence(int_lower_bound(self.0), int_upper_bound(self.1, slice@.len())) }
+        pearlite! { res@ == slice@[int_lower_bound(self.0)..int_upper_bound(self.1, slice@.len())] }
     }
 
     #[logic(open, inline)]

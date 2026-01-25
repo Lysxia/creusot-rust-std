@@ -224,8 +224,8 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
 
 #[erasure(<[T]>::split_at)]
 #[requires(mid@ <= self_@.len())]
-#[ensures(self_@.subsequence(0, mid@) == result.0@)]
-#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@[0..mid@] == result.0@)]
+#[ensures(self_@[mid@..self_@.len()] == result.1@)]
 pub fn split_at<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     match split_at_checked(self_, mid) {
         Some(pair) => pair,
@@ -235,11 +235,11 @@ pub fn split_at<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 
 #[erasure(<[T]>::split_at_mut)]
 #[requires(mid@ <= self_@.len())]
-#[ensures(self_@.subsequence(0, mid@) == result.0@)]
-#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@[0..mid@] == result.0@)]
+#[ensures(self_@[mid@..self_@.len()] == result.1@)]
 #[ensures(self_@.len() == (^self_)@.len())]
-#[ensures((^self_)@.subsequence(0, mid@) == (^result.0)@)]
-#[ensures((^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@)]
+#[ensures((^self_)@[0..mid@] == (^result.0)@)]
+#[ensures((^self_)@[mid@..self_@.len()] == (^result.1)@)]
 pub fn split_at_mut<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     match split_at_mut_checked(self_, mid) {
         Some(pair) => pair,
@@ -249,8 +249,8 @@ pub fn split_at_mut<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
 
 #[erasure(<[T]>::split_at_unchecked)]
 #[requires(mid@ <= self_@.len())]
-#[ensures(self_@.subsequence(0, mid@) == result.0@)]
-#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@[0..mid@] == result.0@)]
+#[ensures(self_@[mid@..self_@.len()] == result.1@)]
 pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     // FIXME(const-hack): the const function `from_raw_parts` is used to make this
     // function const; previously the implementation used
@@ -285,11 +285,11 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 /* pub const */
 #[erasure(<[T]>::split_at_mut_unchecked)]
 #[requires(mid@ <= self_@.len())]
-#[ensures(self_@.subsequence(0, mid@) == result.0@)]
-#[ensures(self_@.subsequence(mid@, self_@.len()) == result.1@)]
+#[ensures(self_@[0..mid@] == result.0@)]
+#[ensures(self_@[mid@..self_@.len()] == result.1@)]
 #[ensures(self_@.len() == (^self_)@.len())]
-#[ensures((^self_)@.subsequence(0, mid@) == (^result.0)@)]
-#[ensures((^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@)]
+#[ensures((^self_)@[0..mid@] == (^result.0)@)]
+#[ensures((^self_)@[mid@..self_@.len()] == (^result.1)@)]
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
     let (ptr, perms) = self_.as_mut_ptr_perm();
@@ -757,8 +757,8 @@ pub fn as_chunks_mut<T, const N: usize>(self_: &mut [T]) -> (&mut [[T; N]], &mut
 #[ensures(match result {
     None => mid@ > self_@.len(),
     Some(result) => mid@ <= self_@.len()
-        && self_@.subsequence(0, mid@) == result.0@
-        && self_@.subsequence(mid@, self_@.len()) == result.1@
+        && self_@[0..mid@] == result.0@
+        && self_@[mid@..self_@.len()] == result.1@
 })]
 pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
     if mid <= self_.len() {
@@ -775,11 +775,11 @@ pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
 #[ensures(match result {
     None => mid@ > self_@.len(),
     Some(result) => mid@ <= self_@.len()
-        && self_@.subsequence(0, mid@) == result.0@
-        && self_@.subsequence(mid@, self_@.len()) == result.1@
+        && self_@[0..mid@] == result.0@
+        && self_@[mid@..self_@.len()] == result.1@
         && self_@.len() == (^self_)@.len()
-        && (^self_)@.subsequence(0, mid@) == (^result.0)@
-        && (^self_)@.subsequence(mid@, self_@.len()) == (^result.1)@
+        && (^self_)@[0..mid@] == (^result.0)@
+        && (^self_)@[mid@..self_@.len()] == (^result.1)@
 })]
 pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T], &mut [T])> {
     if mid <= self_.len() {
