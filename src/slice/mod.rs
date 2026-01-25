@@ -105,12 +105,12 @@ pub unsafe fn get_unchecked<T, I>(self_: &[T], index: I) -> &I::Output
 where
     I: SliceIndex<[T]>,
 {
-    let (ptr, perms) = Perm::from_ref(self_);
+    let (ptr, perm) = Perm::from_ref(self_);
     // SAFETY: the caller must uphold most of the safety requirements for `get_unchecked`;
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
     unsafe {
-        let (ptr, perm) = index.get_unchecked_perm(ptr, perms);
+        let (ptr, perm) = index.get_unchecked_perm(ptr, perm);
         Perm::as_ref(ptr, perm)
     }
 }
@@ -124,12 +124,12 @@ pub unsafe fn get_unchecked_mut<T, I>(self_: &mut [T], index: I) -> &mut I::Outp
 where
     I: SliceIndex<[T]>,
 {
-    let (ptr, perms) = Perm::from_mut(self_);
+    let (ptr, perm) = Perm::from_mut(self_);
     // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
     unsafe {
-        let (ptr, perm) = index.get_unchecked_mut_perm(ptr, perms);
+        let (ptr, perm) = index.get_unchecked_mut_perm(ptr, perm);
         Perm::as_mut(ptr, perm)
     }
 }
@@ -151,16 +151,16 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
         ) => a < len && b < len,
     );
 
-    let (ptr, perms) = self_.as_mut_ptr_perm();
-    let (mut perms, live) = ghost! { perms.into_inner().live_mut() }.split();
+    let (ptr, perm) = self_.as_mut_ptr_perm();
+    let (mut perm, live) = ghost! { perm.into_inner().live_mut() }.split();
     let perm = ghost! {
         if a == b {
             let a_ = Int::new(a as i128).into_inner();
-            vptr::DisjointOrEqual::Equal(perms.index_mut(a_))
+            vptr::DisjointOrEqual::Equal(perm.index_mut(a_))
         } else {
             let a_ = Int::new(a as i128).into_inner();
             let b_ = Int::new(b as i128).into_inner();
-            let (perm_a, perm_b) = block_get_2(perms, a_, b_).into_inner();
+            let (perm_a, perm_b) = block_get_2(perm, a_, b_).into_inner();
             vptr::DisjointOrEqual::Disjoint(perm_a, perm_b)
         }
     };
@@ -257,9 +257,9 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     // `(self.get_unchecked(..mid), self.get_unchecked(mid..))`
 
     let len = self_.len();
-    let (ptr, perms) = self_.as_ptr_perm();
-    let (perms0, perms1) = ghost! {
-        perms.into_inner().split_at(*Int::new(mid as i128))
+    let (ptr, perm) = self_.as_ptr_perm();
+    let (perm0, perm1) = ghost! {
+        perm.into_inner().split_at(*Int::new(mid as i128))
     }
     .split();
     assert_unsafe_precondition!(
@@ -272,11 +272,11 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
     // SAFETY: Caller has to check that `0 <= mid <= self.len()`
     unsafe {
         (
-            from_raw_parts_perm(ptr, mid, perms0),
+            from_raw_parts_perm(ptr, mid, perm0),
             from_raw_parts_perm(
-                ptr.add_live(mid, ghost! { perms0.live() }),
+                ptr.add_live(mid, ghost! { perm0.live() }),
                 unchecked_sub(len, mid),
-                perms1,
+                perm1,
             ),
         )
     }
@@ -292,10 +292,10 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 #[ensures((^self_)@[mid@..self_@.len()] == (^result.1)@)]
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
-    let (ptr, perms) = self_.as_mut_ptr_perm();
-    let (perms, live) = ghost! { perms.into_inner().live_mut() }.split();
-    let (perms0, perms1) = ghost! {
-        perms.into_inner().split_at_mut(*Int::new(mid as i128))
+    let (ptr, perm) = self_.as_mut_ptr_perm();
+    let (perm, live) = ghost! { perm.into_inner().live_mut() }.split();
+    let (perm0, perm1) = ghost! {
+        perm.into_inner().split_at_mut(*Int::new(mid as i128))
     }
     .split();
 
@@ -312,8 +312,8 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     // is fine.
     unsafe {
         (
-            from_raw_parts_mut_perm(ptr, mid, perms0),
-            from_raw_parts_mut_perm(ptr.add_live(mid, live), unchecked_sub(len, mid), perms1),
+            from_raw_parts_mut_perm(ptr, mid, perm0),
+            from_raw_parts_mut_perm(ptr.add_live(mid, live), unchecked_sub(len, mid), perm1),
         )
     }
 }
