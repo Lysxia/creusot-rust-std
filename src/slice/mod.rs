@@ -552,11 +552,11 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
     Some(unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) })
 }
 
+// #[erasure(<[T]>::as_mut_ptr_range)] // TODO: self.len() is called later in core (in start.add(...)), for now...
 #[ensures(*(*result.1).val() == *self_)]
 #[ensures(*(^result.1).val() == ^self_)]
 #[ensures(result.0.start as *const T == result.1.ward().thin())]
 #[ensures(result.0.end as *const T == result.0.start.offset_logic(result.1.len()))]
-// #[erasure(<[T]>::as_mut_ptr_range)] // TODO: self.len() is called later in core (in start.add(...)), for now...
 /* pub const */
 pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*const [T]>>) {
     let len = self_.len(); // Get the length before borrowing `self_`
