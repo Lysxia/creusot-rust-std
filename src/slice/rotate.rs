@@ -23,12 +23,12 @@ pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
         return;
     }
     // `T` is not a zero-sized type, so it's okay to divide by its size.
-    if !cfg!(feature = "optimize_for_size")
+    if flag(!cfg!(feature = "optimize_for_size"))
         && cmp::min(left, right) <= size_of::<BufType>() / size_of::<T>()
     {
         // SAFETY: guaranteed by the caller
         unsafe { ptr_rotate_memmove(left, mid, right) };
-    } else if !cfg!(feature = "optimize_for_size")
+    } else if flag(!cfg!(feature = "optimize_for_size"))
         && ((left + right < 24) || (size_of::<T>() > size_of::<[usize; 4]>()))
     {
         // SAFETY: guaranteed by the caller
@@ -37,6 +37,11 @@ pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
         // SAFETY: guaranteed by the caller
         unsafe { ptr_rotate_swap(left, mid, right) }
     }
+}
+
+/// Hide the actual value of a compile-time flag to verify both code paths at the same time
+fn flag(b: bool) -> bool {
+    b
 }
 
 /// Algorithm 1 is used if `min(left, right)` is small enough to fit onto a stack buffer. The

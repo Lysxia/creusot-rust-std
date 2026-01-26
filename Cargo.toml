@@ -8,3 +8,6 @@ creusot-std = "0.9.0"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(creusot)'] }
+
+[features]
+optimize_for_size = []
