@@ -374,6 +374,28 @@ pub fn cast_chunks_perm_mut<const N: usize, T>(
 #[allow(unused_variables)]
 #[trusted]
 #[check(ghost_trusted)]
+#[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
+#[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
+pub fn cast_from_chunks_perm<const N: usize, T>(perm: &Perm<*const [[T; N]]>) -> &Perm<*const [T]> {
+    unreachable!("ghost code")
+}
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
+#[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
+#[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
+#[ensures(perm.ward() == (^perm).ward())]
+#[ensures(forall<i> 0 <= i && i < perm.len() ==> (^perm).val()@[i]@ == (^result).val()@[N@ * i .. N@ * i + N@])]
+pub fn cast_from_chunks_perm_mut<const N: usize, T>(
+    perm: &mut Perm<*const [[T; N]]>,
+) -> &mut Perm<*const [T]> {
+    unreachable!("ghost code")
+}
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
 #[requires(perm.len() == N@)]
 #[ensures(*result.ward() == *perm.ward() as *const [T; N])]
 #[ensures(result.val()@ == perm.val()@)]

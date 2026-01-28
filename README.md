@@ -48,5 +48,5 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | as_simd_mut | ❌ | Needs spec for pointer cast |
 | get_disjoint_mut | ❌ | |
 | get_disjoint_check_valid | ❌ | |
-| as_flattened | ❌ | |
-| as_flattened_mut | ❌ | |
+| as_flattened | ✅ | `cast_from_chunks_perm` |
+| as_flattened_mut | ✅ | `cast_from_chunks_perm_mut` |
