@@ -67,3 +67,6 @@ jobs:
 
       - name: Run Creusot
         run: cargo creusot prove
+
+      - name: Check erasure
+        run: cargo clean && cargo creusot --erasure-check
