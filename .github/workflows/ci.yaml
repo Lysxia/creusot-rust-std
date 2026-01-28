@@ -45,6 +45,12 @@ jobs:
             ~/.local/share/creusot
           key: ${{ runner.os }}
 
+      - name: Cache solver runs
+        uses: actions/cache@v4
+        with:
+          path: .why3find
+          key: ${{ runner.os }}
+
       - name: System dependencies
         run: |
           sudo apt update && sudo apt install opam libzmq3-dev
@@ -60,4 +66,4 @@ jobs:
         run: rustup component add rust-src --toolchain nightly-2025-11-13
 
       - name: Run Creusot
-        run: cargo creusot
+        run: cargo creusot prove
