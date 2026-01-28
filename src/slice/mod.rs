@@ -7,7 +7,9 @@
 // #![stable(feature = "rust1", since = "1.0.0")]
 
 use crate::intrinsics::{exact_div, unchecked_sub};
-use crate::ptr::{cast_array_perm, cast_array_perm_mut};
+use crate::ptr::{
+    cast_array_perm, cast_array_perm_mut, cast_from_chunks_perm, cast_from_chunks_perm_mut,
+};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
 use creusot_std::{
@@ -1191,32 +1193,38 @@ pub trait ArraySliceExt<T, const N: usize> {
     fn as_flattened_mut(&mut self) -> &mut [T];
 }
 
-impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
-    #[trusted] // TODO
-    fn as_flattened(&self) -> &[T] {
-        let len = if T::IS_ZST {
-            self.len().checked_mul(N).expect("slice len overflow")
-        } else {
-            // SAFETY: `self.len() * N` cannot overflow because `self` is
-            // already in the address space.
-            unsafe { self.len().unchecked_mul(N) }
-        };
-        // SAFETY: `[T]` is layout-identical to `[T; N]`
-        unsafe { from_raw_parts(self.as_ptr().cast(), len) }
-    }
+#[erasure(<[[T; N]]>::as_flattened)]
+#[ensures(result@ == self_@.flat_map(|chunk: [T; N]| chunk@))]
+pub fn as_flattened<T, const N: usize>(self_: &[[T; N]]) -> &[T] {
+    let len = if T::IS_ZST {
+        self_.len().checked_mul(N).expect("slice len overflow")
+    } else {
+        // SAFETY: `self.len() * N` cannot overflow because `self` is
+        // already in the address space.
+        unsafe { self_.len().unchecked_mul(N) }
+    };
+    let (ptr, perm) = self_.as_ptr_perm();
+    let perm = ghost! { cast_from_chunks_perm(perm.into_inner()) };
+    // SAFETY: `[T]` is layout-identical to `[T; N]`
+    unsafe { from_raw_parts_perm(ptr.cast(), len, perm) }
+}
 
-    #[trusted] // TODO
-    fn as_flattened_mut(&mut self) -> &mut [T] {
-        let len = if T::IS_ZST {
-            self.len().checked_mul(N).expect("slice len overflow")
-        } else {
-            // SAFETY: `self.len() * N` cannot overflow because `self` is
-            // already in the address space.
-            unsafe { self.len().unchecked_mul(N) }
-        };
-        // SAFETY: `[T]` is layout-identical to `[T; N]`
-        unsafe { from_raw_parts_mut(self.as_mut_ptr().cast(), len) }
-    }
+#[erasure(<[[T; N]]>::as_flattened_mut)]
+#[ensures(result@ == self_@.flat_map(|chunk: [T; N]| chunk@))]
+#[ensures((^self_)@.len() == self_@.len())]
+#[ensures(forall<i> 0 <= i && i < self_@.len() ==> (^self_)@[i]@ == (^result)@[N@ * i..N@ * i + N@])]
+pub fn as_flattened_mut<T, const N: usize>(self_: &mut [[T; N]]) -> &mut [T] {
+    let len = if T::IS_ZST {
+        self_.len().checked_mul(N).expect("slice len overflow")
+    } else {
+        // SAFETY: `self.len() * N` cannot overflow because `self` is
+        // already in the address space.
+        unsafe { self_.len().unchecked_mul(N) }
+    };
+    let (ptr, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost! { cast_from_chunks_perm_mut(perm.into_inner()) };
+    // SAFETY: `[T]` is layout-identical to `[T; N]`
+    unsafe { from_raw_parts_mut_perm(ptr.cast(), len, perm) }
 }
 
 #[ensures(result == if b { true_val } else { false_val })]
