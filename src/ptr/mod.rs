@@ -1,4 +1,4 @@
-use crate::intrinsics;
+use crate::{intrinsics, ub_checks};
 use ::core::mem::SizedTypeProperties as _;
 use core::hint::assert_unchecked as assume;
 use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
@@ -373,7 +373,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
     // SAFETY: the safety contract for `copy` must be upheld by the caller.
     unsafe {
-        crate::ub_checks::assert_unsafe_precondition!(
+        ub_checks::assert_unsafe_precondition!(
             check_language_ub,
             "ptr::copy requires that both pointer arguments are aligned and non-null",
             pearlite! { src.is_aligned_to_logic(align) && (zero_size || !src.is_null_logic())
@@ -384,11 +384,51 @@ pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
                 align: usize = align_of::<T>(),
                 zero_size: bool = T::IS_ZST || count == 0,
             ) =>
-            crate::ub_checks::maybe_is_aligned_and_not_null(src, align, zero_size)
-                && crate::ub_checks::maybe_is_aligned_and_not_null(dst, align, zero_size)
+            ub_checks::maybe_is_aligned_and_not_null(src, align, zero_size)
+                && ub_checks::maybe_is_aligned_and_not_null(dst, align, zero_size)
         );
         crate::intrinsics::copy(src, dst, count)
     }
+}
+
+// The nonoverlap is guaranteed by the permissions' ownership.
+#[trusted] // TODO: need fact: nonoverlapping allocations have distant addresses
+#[erasure(core::ptr::copy_nonoverlapping::<T>)]
+#[requires(src_perm.ward().thin() == src && src_perm.len() == count@)]
+#[requires(dst_perm.ward().thin() == dst as *const T && dst_perm.len() == count@)]
+#[ensures((^dst_perm).val()@ == src_perm.val()@)]
+/* pub const */
+pub unsafe fn copy_nonoverlapping<T>(
+    src: *const T,
+    dst: *mut T,
+    count: usize,
+    src_perm: Ghost<&Perm<*const [T]>>,
+    dst_perm: Ghost<&mut Perm<*const [T]>>,
+) {
+    ub_checks::assert_unsafe_precondition!(
+        check_language_ub,
+        "ptr::copy_nonoverlapping requires that both pointer arguments are aligned and non-null \
+        and the specified memory ranges do not overlap",
+        pearlite! { src.is_aligned_to_logic(align) && (count@ == 0 || size@ == 0 || !src.is_null_logic())
+            && dst.is_aligned_to_logic(align) && (count@ == 0 || size@ == 0 || !dst.is_null_logic())
+            && false /* TODO */ },
+        (
+            src: *const () = src as *const (),
+            dst: *mut () = dst as *mut (),
+            size: usize = size_of::<T>(),
+            align: usize = align_of::<T>(),
+            count: usize = count,
+        ) => {
+            let zero_size = count == 0 || size == 0;
+            ub_checks::maybe_is_aligned_and_not_null(src, align, zero_size)
+                && ub_checks::maybe_is_aligned_and_not_null(dst, align, zero_size)
+                && ub_checks::maybe_is_nonoverlapping(src, dst, size, count)
+        }
+    );
+
+    // SAFETY: the safety contract for `copy_nonoverlapping` must be
+    // upheld by the caller.
+    unsafe { crate::intrinsics::copy_nonoverlapping(src, dst, count, src_perm, dst_perm) }
 }
 
 #[allow(unused_variables)]

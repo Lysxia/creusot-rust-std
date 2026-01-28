@@ -88,3 +88,34 @@ pub(crate) const fn is_valid_allocation_size(size: usize, len: usize) -> bool {
     };
     len <= max_len
 }
+
+#[trusted]
+#[erasure(private core::ub_checks::maybe_is_nonoverlapping)]
+#[requires(size@ * count@ <= usize::MAX@)]
+#[ensures(src.addr_logic()@.abs_diff(dst.addr_logic()@) >= size@ * count@)]
+pub(crate) const fn maybe_is_nonoverlapping(
+    src: *const (),
+    dst: *const (),
+    size: usize,
+    count: usize,
+) -> bool {
+    // This is just for safety checks so we can const_eval_select.
+    const_eval_select!(
+        @capture { src: *const (), dst: *const (), size: usize, count: usize } -> bool:
+        if const {
+            true
+        } else {
+            let src_usize = src.addr();
+            let dst_usize = dst.addr();
+            let Some(size) = size.checked_mul(count) else {
+                core::panicking::panic_nounwind(
+                    "is_nonoverlapping: `size_of::<T>() * count` overflows a usize",
+                )
+            };
+            let diff = src_usize.abs_diff(dst_usize);
+            // If the absolute distance between the ptrs is at least as big as the size of the buffer,
+            // they do not overlap.
+            diff >= size
+        }
+    )
+}

@@ -1084,7 +1084,9 @@ pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     }
 }
 
-#[trusted] // TODO
+// #[erasure(<[T]>::copy_from_slice)] // TODO: reordered self.len()
+#[requires(self_@.len() == src@.len())]
+#[ensures((^self_)@ == src@)]
 /* pub const */
 pub fn copy_from_slice<T>(self_: &mut [T], src: &[T])
 where
@@ -1096,6 +1098,7 @@ where
     // #[cfg_attr(feature = "panic_immediate_abort", inline)]
     #[track_caller]
     #[allow(unused_variables)]
+    #[requires(false)]
     const fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
         // const_panic!(
         //     "copy_from_slice: source slice length does not match destination slice length",
@@ -1110,11 +1113,14 @@ where
         len_mismatch_fail(self_.len(), src.len());
     }
 
+    let len = self_.len();
+    let (src_ptr, src_perm) = src.as_ptr_perm();
+    let (dst_ptr, dst_perm) = self_.as_mut_ptr_perm();
     // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
     // checked to have the same length. The slices cannot overlap because
     // mutable references are exclusive.
     unsafe {
-        ptr::copy_nonoverlapping(src.as_ptr(), self_.as_mut_ptr(), self_.len());
+        crate::ptr::copy_nonoverlapping(src_ptr, dst_ptr, len, src_perm, dst_perm);
     }
 }
 

@@ -41,7 +41,7 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | partition_dedup_by | ❌ | |
 | rotate_left | ❌ | |
 | rotate_right | ❌ | |
-| copy_from_slice | ❌ | |
+| copy_from_slice | 🔧 | `copy_nonoverlapping` |
 | copy_within | ❌ | |
 | swap_with_slice | ❌ | |
 | as_simd | ❌ | Needs spec for pointer cast |

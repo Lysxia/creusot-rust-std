@@ -169,6 +169,23 @@ pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
     unsafe { core::intrinsics::copy(src, dst, count) }
 }
 
+#[trusted]
+#[erasure(core::intrinsics::copy_nonoverlapping::<T>)]
+#[requires(src_perm.ward().thin() == src && src_perm.len() == count@)]
+#[requires(dst_perm.ward().thin() == dst as *const T && dst_perm.len() == count@)]
+#[ensures((^dst_perm).val()@ == src_perm.val()@)]
+/* pub const */
+pub unsafe fn copy_nonoverlapping<T>(
+    src: *const T,
+    dst: *mut T,
+    count: usize,
+    src_perm: Ghost<&Perm<*const [T]>>,
+    dst_perm: Ghost<&mut Perm<*const [T]>>,
+) {
+    let _ = (src_perm, dst_perm);
+    unsafe { core::intrinsics::copy_nonoverlapping(src, dst, count) }
+}
+
 pub(crate) macro const_eval_select {
     (
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
