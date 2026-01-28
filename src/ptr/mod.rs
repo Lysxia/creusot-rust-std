@@ -1,4 +1,5 @@
 use crate::intrinsics;
+use ::core::mem::SizedTypeProperties as _;
 use core::hint::assert_unchecked as assume;
 use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
 mod const_ptr;
@@ -337,6 +338,56 @@ impl<'a, T> DisjointOrEqual<'a, T> {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(_, p) => p,
         }
+    }
+}
+
+/// Copies `count * size_of::<T>()` bytes from `src` to `dst`. The source
+/// and destination may overlap.
+///
+/// The copy is "untyped" in the sense that data may be uninitialized or otherwise violate the
+/// requirements of `T`. The initialization state is preserved exactly.
+///
+/// # Safety
+///
+/// Behavior is undefined if any of the following conditions are violated:
+///
+/// * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
+///
+/// * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes, and must remain valid even
+///   when `src` is read for `count * size_of::<T>()` bytes. (This means if the memory ranges
+///   overlap, the `dst` pointer must not be invalidated by `src` reads.)
+///
+/// * Both `src` and `dst` must be properly aligned.
+///
+/// Like [`read`], `copy` creates a bitwise copy of `T`, regardless of
+/// whether `T` is [`Copy`]. If `T` is not [`Copy`], using both the values
+/// in the region beginning at `*src` and the region beginning at `*dst` can
+/// [violate memory safety][read-ownership].
+///
+/// Note that even if the effectively copied size (`count * size_of::<T>()`) is
+/// `0`, the pointers must be properly aligned.
+#[trusted] // TODO
+#[erasure(core::ptr::copy::<T>)]
+#[requires(false)]
+/* pub const */
+pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
+    // SAFETY: the safety contract for `copy` must be upheld by the caller.
+    unsafe {
+        crate::ub_checks::assert_unsafe_precondition!(
+            check_language_ub,
+            "ptr::copy requires that both pointer arguments are aligned and non-null",
+            pearlite! { src.is_aligned_to_logic(align) && (zero_size || !src.is_null_logic())
+                && dst.is_aligned_to_logic(align) && (zero_size || !dst.is_null_logic()) },
+            (
+                src: *const () = src as *const (),
+                dst: *mut () = dst as *mut (),
+                align: usize = align_of::<T>(),
+                zero_size: bool = T::IS_ZST || count == 0,
+            ) =>
+            crate::ub_checks::maybe_is_aligned_and_not_null(src, align, zero_size)
+                && crate::ub_checks::maybe_is_aligned_and_not_null(dst, align, zero_size)
+        );
+        crate::intrinsics::copy(src, dst, count)
     }
 }
 

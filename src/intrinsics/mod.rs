@@ -161,6 +161,14 @@ pub fn aggregate_raw_ptr_mut_slice<T>(ptr: *mut T, len: usize) -> *mut [T] {
     core::intrinsics::aggregate_raw_ptr(ptr, len)
 }
 
+#[trusted]
+#[erasure(core::intrinsics::copy::<T>)]
+#[requires(false)] // TODO: source and destination may overlap. Sounds tricky.
+/* pub const */
+pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
+    unsafe { core::intrinsics::copy(src, dst, count) }
+}
+
 pub(crate) macro const_eval_select {
     (
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
