@@ -472,6 +472,23 @@ where
 
 // Prove that the following safe abstractions (in library/core/src/slice/mod.rs) do not cause undefined behavior:
 
+// TODO: upstream to creusot-std
+extern_spec! {
+    impl<T> *const T {
+        #[ensures(result as *const T == self)]
+        fn cast_array<const N: usize>(self) -> *const [T; N] {
+            self.cast()
+        }
+    }
+
+    impl<T> *mut T {
+        #[ensures(result as *mut T == self)]
+        fn cast_array<const N: usize>(self) -> *mut [T; N] {
+            self.cast()
+        }
+    }
+}
+
 #[erasure(<[T]>::first_chunk::<N>)]
 #[ensures(match result {
     None => self_@.len() < N@,
@@ -487,7 +504,7 @@ pub fn first_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
             cast_array_perm(perm.into_inner().split_at(*Int::new(N as i128)).0)
         }; // SAFETY: We explicitly check for the correct number of elements,
         //   and do not let the reference outlive the slice.
-        Some(unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) })
+        Some(unsafe { Perm::as_ref(ptr.cast_array(), perm) })
     }
 }
 
@@ -509,7 +526,7 @@ pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]
         // SAFETY: We explicitly check for the correct number of elements,
         //   do not let the reference outlive the slice,
         //   and require exclusive access to the entire slice to mutate the chunk.
-        Some(unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) })
+        Some(unsafe { Perm::as_mut(ptr.cast_array(), perm) })
     }
 }
 
@@ -528,7 +545,7 @@ pub fn split_first_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T; N], &[T
     let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some((unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) }, tail))
+    Some((unsafe { Perm::as_ref(ptr.cast_array(), perm) }, tail))
 }
 
 #[erasure(<[T]>::split_first_chunk_mut::<N>)]
@@ -550,7 +567,7 @@ pub fn split_first_chunk_mut<T, const N: usize>(
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
-    Some((unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) }, tail))
+    Some((unsafe { Perm::as_mut(ptr.cast_array(), perm) }, tail))
 }
 
 #[erasure(<[T]>::split_last_chunk::<N>)]
@@ -569,7 +586,7 @@ pub fn split_last_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T], &[T; N]
     let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some((init, unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) }))
+    Some((init, unsafe { Perm::as_ref(ptr.cast_array(), perm) }))
 }
 
 #[erasure(<[T]>::split_last_chunk_mut::<N>)]
@@ -590,7 +607,7 @@ pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut 
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
-    Some((init, unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) }))
+    Some((init, unsafe { Perm::as_mut(ptr.cast_array(), perm) }))
 }
 
 #[erasure(<[T]>::last_chunk::<N>)]
@@ -610,7 +627,7 @@ pub fn last_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
     let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some(unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) })
+    Some(unsafe { Perm::as_ref(ptr.cast_array(), perm) })
 }
 
 #[erasure(<[T]>::last_chunk_mut::<N>)]
@@ -632,7 +649,7 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and require exclusive access to the entire slice to mutate the chunk.
-    Some(unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) })
+    Some(unsafe { Perm::as_mut(ptr.cast_array(), perm) })
 }
 
 // #[erasure(<[T]>::as_mut_ptr_range)] // TODO: self.len() is called later in core (in start.add(...)), for now...
