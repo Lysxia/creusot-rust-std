@@ -435,6 +435,39 @@ pub unsafe fn align_to_mut<T, U>(self_: &mut [T]) -> (&mut [T], &mut [U], &mut [
     }
 }
 
+#[allow(unused)] // TODO
+#[trusted] // TODO: needs MaybeUninit
+// #[erasure(<[T]>::get_disjoint_unchecked_mut::<I, N>)] // TODO: not the same traits
+pub unsafe fn get_disjoint_unchecked_mut<T, I, const N: usize>(
+    self_: &mut [T],
+    indices: [I; N],
+) -> [&mut I::Output; N]
+where
+    I: GetDisjointMutIndex + SliceIndex<[T]>,
+{
+    // NB: This implementation is written as it is because any variation of
+    // `indices.map(|i| self.get_unchecked_mut(i))` would make miri unhappy,
+    // or generate worse code otherwise. This is also why we need to go
+    // through a raw pointer here.
+    let slice: *mut [T] = self_;
+    let mut arr: MaybeUninit<[&mut I::Output; N]> = MaybeUninit::uninit();
+    let arr_ptr = arr.as_mut_ptr();
+
+    // SAFETY: We expect `indices` to contain disjunct values that are
+    // in bounds of `self`.
+    unsafe {
+        for i in 0..N {
+            let idx = indices.get_unchecked(i).clone();
+            arr_ptr.cast::<&mut I::Output>().add(i).write(
+                // &mut *slice.get_unchecked_mut(idx)
+                // &mut *idx.get_unchecked_mut_perm(slice, todo!()),
+                todo!(),
+            );
+        }
+        arr.assume_init()
+    }
+}
+
 // Prove that the following safe abstractions (in library/core/src/slice/mod.rs) do not cause undefined behavior:
 
 #[erasure(<[T]>::first_chunk::<N>)]
@@ -1151,39 +1184,6 @@ where
     // SAFETY: The `get_disjoint_check_valid()` call checked that all indices
     // are disjunct and in bounds.
     unsafe { Ok(get_disjoint_unchecked_mut(self_, indices)) }
-}
-
-#[allow(unused)] // TODO
-#[trusted] // TODO
-// #[erasure(<[T]>::get_disjoint_unchecked_mut::<I, N>)] // TODO: not the same traits
-pub unsafe fn get_disjoint_unchecked_mut<T, I, const N: usize>(
-    self_: &mut [T],
-    indices: [I; N],
-) -> [&mut I::Output; N]
-where
-    I: GetDisjointMutIndex + SliceIndex<[T]>,
-{
-    // NB: This implementation is written as it is because any variation of
-    // `indices.map(|i| self.get_unchecked_mut(i))` would make miri unhappy,
-    // or generate worse code otherwise. This is also why we need to go
-    // through a raw pointer here.
-    let slice: *mut [T] = self_;
-    let mut arr: MaybeUninit<[&mut I::Output; N]> = MaybeUninit::uninit();
-    let arr_ptr = arr.as_mut_ptr();
-
-    // SAFETY: We expect `indices` to contain disjunct values that are
-    // in bounds of `self`.
-    unsafe {
-        for i in 0..N {
-            let idx = indices.get_unchecked(i).clone();
-            arr_ptr.cast::<&mut I::Output>().add(i).write(
-                // &mut *slice.get_unchecked_mut(idx)
-                // &mut *idx.get_unchecked_mut_perm(slice, todo!()),
-                todo!(),
-            );
-        }
-        arr.assume_init()
-    }
 }
 
 pub trait ArraySliceExt<T, const N: usize> {
