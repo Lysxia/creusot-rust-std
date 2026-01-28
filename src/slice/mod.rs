@@ -460,7 +460,7 @@ pub fn first_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
 #[ensures(match result {
     None => self_@.len() < N@ && resolve(self_),
     Some(chunk) => N@ <= self_@.len() && chunk@ == self_@[..N@]
-        && (^self_)@ == self_@[..self_@.len() - N@].concat((^chunk)@),
+        && (^self_)@ == (^chunk)@.concat(self_@[N@..]),
 })]
 /* pub const */
 pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]> {
