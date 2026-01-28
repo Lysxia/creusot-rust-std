@@ -17,7 +17,7 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | split_at_mut_unchecked | ✅ | |
 | align_to | ❌ | Needs spec for pointer cast |
 | align_to_mut | ❌ | Needs spec for pointer cast |
-| get_disjoint_unchecked_mut | ❌ | |
+| get_disjoint_unchecked_mut | ❌ | Needs MaybeUninit |
 
 ### Verified safe functions
 
