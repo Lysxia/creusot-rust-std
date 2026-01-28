@@ -839,7 +839,9 @@ pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T],
     }
 }
 
-#[trusted] // TODO
+// Try to just prove safety for now
+// #[erasure(<[T]>::binary_search_by::<'a, F>)] // TODO: unsupported syntax
+#[requires(forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition((&x,)))]
 pub fn binary_search_by<'a, T, F>(self_: &'a [T], mut f: F) -> Result<usize, usize>
 where
     F: FnMut(&'a T) -> Ordering,
@@ -850,10 +852,14 @@ where
     }
     let mut base = 0usize;
 
+    let _f0 = snapshot! { f };
     // This loop intentionally doesn't have an early exit if the comparison
     // returns Equal. We want the number of loop iterations to depend *only*
     // on the size of the input slice so that the CPU can reliably predict
     // the loop count.
+    #[invariant(base@ < self_@.len() && base@ + size@ <= self_@.len())]
+    #[invariant(_f0.hist_inv(f))]
+    #[variant(size@)]
     while size > 1 {
         let half = size / 2;
         let mid = base + half;
@@ -1213,7 +1219,7 @@ impl<T, const N: usize> ArraySliceExt<T, N> for [[T; N]] {
     }
 }
 
-#[trusted] // TODO
+#[ensures(result == if b { true_val } else { false_val })]
 // from std::hint since 1.89
 fn select_unpredictable<T>(b: bool, true_val: T, false_val: T) -> T {
     if b { true_val } else { false_val }
