@@ -7,6 +7,7 @@
 // #![stable(feature = "rust1", since = "1.0.0")]
 
 use crate::intrinsics::{exact_div, unchecked_sub};
+use crate::ptr::{cast_array_perm, cast_array_perm_mut};
 use core::cmp::Ordering::{self, Equal, Greater, Less};
 use core::mem::{self, MaybeUninit, SizedTypeProperties};
 use creusot_std::{
@@ -188,7 +189,7 @@ pub unsafe fn as_chunks_unchecked<T, const N: usize>(self_: &[T]) -> &[[T; N]] {
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
     let (ptr, perm) = self_.as_ptr_perm();
-    let perm = ghost! { crate::ptr::cast_array_perm(perm.into_inner()) };
+    let perm = ghost! { crate::ptr::cast_chunks_perm(perm.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
     unsafe { from_raw_parts_perm(ptr.cast(), new_len, perm) }
@@ -216,7 +217,7 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
     let (ptr, perm) = self_.as_mut_ptr_perm();
-    let perm = ghost! { crate::ptr::cast_array_perm_mut(perm.into_inner()) };
+    let perm = ghost! { crate::ptr::cast_chunks_perm_mut(perm.into_inner()) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
     unsafe { from_raw_parts_mut_perm((ptr as *mut T).cast(), new_len, perm) }
@@ -436,78 +437,112 @@ pub unsafe fn align_to_mut<T, U>(self_: &mut [T]) -> (&mut [T], &mut [U], &mut [
 
 // Prove that the following safe abstractions (in library/core/src/slice/mod.rs) do not cause undefined behavior:
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::first_chunk::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@,
+    Some(chunk) => N@ <= self_@.len() && chunk@ == self_@[..N@],
+})]
 /* pub const */
 pub fn first_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
     if self_.len() < N {
         None
     } else {
-        // SAFETY: We explicitly check for the correct number of elements,
+        let (ptr, perm) = self_.as_ptr_perm();
+        let perm = ghost! {
+            cast_array_perm(perm.into_inner().split_at(*Int::new(N as i128)).0)
+        }; // SAFETY: We explicitly check for the correct number of elements,
         //   and do not let the reference outlive the slice.
-        Some(unsafe { &*(self_.as_ptr().cast::<[T; N]>()) })
+        Some(unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) })
     }
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::first_chunk_mut::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@ && resolve(self_),
+    Some(chunk) => N@ <= self_@.len() && chunk@ == self_@[..N@]
+        && (^self_)@ == self_@[..self_@.len() - N@].concat((^chunk)@),
+})]
 /* pub const */
 pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]> {
     if self_.len() < N {
         None
     } else {
+        let (ptr, perm) = self_.as_mut_ptr_perm();
+        let perm = ghost! {
+            cast_array_perm_mut(perm.into_inner().split_at_mut(*Int::new(N as i128)).0)
+        };
         // SAFETY: We explicitly check for the correct number of elements,
         //   do not let the reference outlive the slice,
         //   and require exclusive access to the entire slice to mutate the chunk.
-        Some(unsafe { &mut *(self_.as_mut_ptr().cast::<[T; N]>()) })
+        Some(unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) })
     }
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::split_first_chunk::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@,
+    Some((first, tail)) => N@ <= self_@.len() && first@ == self_@[..N@] && tail@ == self_@[N@..],
+})]
 /* pub const */
 pub fn split_first_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T; N], &[T])> {
-    let Some((first, tail)) = self_.split_at_checked(N) else {
+    let Some((first, tail)) = split_at_checked(self_, N) else {
         return None;
     };
 
+    let (ptr, perm) = first.as_ptr_perm();
+    let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some((unsafe { &*(first.as_ptr().cast::<[T; N]>()) }, tail))
+    Some((unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) }, tail))
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::split_first_chunk_mut::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@ && resolve(self_),
+    Some((first, tail)) => N@ <= self_@.len() && first@ == self_@[..N@] && tail@ == self_@[N@..]
+        && (^self_)@.len() == self_@.len() && (^self_)@ == (^first)@.concat((^tail)@),
+})]
 /* pub const */
 pub fn split_first_chunk_mut<T, const N: usize>(
     self_: &mut [T],
 ) -> Option<(&mut [T; N], &mut [T])> {
-    let Some((first, tail)) = self_.split_at_mut_checked(N) else {
+    let Some((first, tail)) = split_at_mut_checked(self_, N) else {
         return None;
     };
 
+    let (ptr, perm) = first.as_mut_ptr_perm();
+    let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
-    Some((unsafe { &mut *(first.as_mut_ptr().cast::<[T; N]>()) }, tail))
+    Some((unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) }, tail))
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::split_last_chunk::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@,
+    Some((init, last)) => N@ <= self_@.len() && init@ == self_@[..self_@.len() - N@] && last@ == self_@[self_@.len() - N@..],
+})]
 /* pub const */
 pub fn split_last_chunk<T, const N: usize>(self_: &[T]) -> Option<(&[T], &[T; N])> {
     let Some(index) = self_.len().checked_sub(N) else {
         return None;
     };
-    let (init, last) = self_.split_at(index);
+    let (init, last) = split_at(self_, index);
 
+    let (ptr, perm) = last.as_ptr_perm();
+    let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some((init, unsafe { &*(last.as_ptr().cast::<[T; N]>()) }))
+    Some((init, unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) }))
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::split_last_chunk_mut::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@ && resolve(self_),
+    Some((init, last)) => N@ <= self_@.len() && init@ == self_@[..self_@.len() - N@] && last@ == self_@[self_@.len() - N@..]
+        && (^self_)@.len() == self_@.len() && (^self_)@ == (^init)@.concat((^last)@),
+})]
 /* pub const */
 pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut [T], &mut [T; N])> {
     let Some(index) = self_.len().checked_sub(N) else {
@@ -515,41 +550,54 @@ pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut 
     };
     let (init, last) = self_.split_at_mut(index);
 
+    let (ptr, perm) = last.as_mut_ptr_perm();
+    let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
-    Some((init, unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) }))
+    Some((init, unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) }))
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::last_chunk::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@,
+    Some(chunk) => N@ <= self_@.len() && chunk@ == self_@[self_@.len() - N@..],
+})]
 /* pub const */
 pub fn last_chunk<T, const N: usize>(self_: &[T]) -> Option<&[T; N]> {
     // FIXME(const-hack): Without const traits, we need this instead of `get`.
     let Some(index) = self_.len().checked_sub(N) else {
         return None;
     };
-    let (_, last) = self_.split_at(index);
+    let (_, last) = split_at(self_, index);
 
+    let (ptr, perm) = last.as_ptr_perm();
+    let perm = ghost! { cast_array_perm(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   and do not let the references outlive the slice.
-    Some(unsafe { &*(last.as_ptr().cast::<[T; N]>()) })
+    Some(unsafe { Perm::as_ref(ptr.cast::<[T; N]>(), perm) })
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[erasure(<[T]>::last_chunk_mut::<N>)]
+#[ensures(match result {
+    None => self_@.len() < N@ && resolve(self_),
+    Some(chunk) => N@ <= self_@.len() && chunk@ == self_@[self_@.len() - N@..]
+        && (^self_)@ == self_@[..self_@.len() - N@].concat((^chunk)@),
+})]
 /* pub const */
 pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]> {
     // FIXME(const-hack): Without const traits, we need this instead of `get`.
     let Some(index) = self_.len().checked_sub(N) else {
         return None;
     };
-    let (_, last) = self_.split_at_mut(index);
+    let (_, last) = split_at_mut(self_, index);
 
+    let (ptr, perm) = last.as_mut_ptr_perm();
+    let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and require exclusive access to the entire slice to mutate the chunk.
-    Some(unsafe { &mut *(last.as_mut_ptr().cast::<[T; N]>()) })
+    Some(unsafe { Perm::as_mut(ptr.cast::<[T; N]>(), perm) })
 }
 
 // #[erasure(<[T]>::as_mut_ptr_range)] // TODO: self.len() is called later in core (in start.add(...)), for now...
@@ -773,7 +821,7 @@ pub fn split_at_checked<T>(self_: &[T], mid: usize) -> Option<(&[T], &[T])> {
 /* pub const */
 #[erasure(<[T]>::split_at_mut_checked)]
 #[ensures(match result {
-    None => mid@ > self_@.len(),
+    None => mid@ > self_@.len() && resolve(self_),
     Some(result) => mid@ <= self_@.len()
         && self_@[0..mid@] == result.0@
         && self_@[mid@..self_@.len()] == result.1@

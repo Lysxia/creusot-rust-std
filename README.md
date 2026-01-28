@@ -11,8 +11,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | get_unchecked | ✅ | Slice indexing with `usize` is an intrinsic, but this also includes indexing with ranges |
 | get_unchecked_mut | ✅ | idem |
 | swap_unchecked | ✅ | `::core::ptr::swap` (`swap_disjoint`) |
-| as_chunks_unchecked | ✅ | `cast_array_perm` (ad hoc axiomatization of pointer cast) |
-| as_chunks_unchecked_mut | ✅ | `cast_array_perm_mut` |
+| as_chunks_unchecked | ✅ | `cast_chunks_perm` (ad hoc axiomatization of pointer cast) |
+| as_chunks_unchecked_mut | ✅ | `cast_chunks_perm_mut` |
 | split_at_unchecked | ✅ | |
 | split_at_mut_unchecked | ✅ | |
 | align_to | ❌ | Needs spec for pointer cast |
@@ -23,14 +23,14 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 
 | Function | Proof status | Comments |
 |-|-|-|
-| first_chunk | ❌ | |
-| first_chunk_mut | ❌ | |
-| split_first_chunk | ❌ | |
-| split_first_chunk_mut | ❌ | |
-| split_last_chunk | ❌ | |
-| split_last_chunk_mut | ❌ | |
-| last_chunk | ❌ | |
-| last_chunk_mut | ❌ | |
+| first_chunk | ✅ | `cast_array_perm` |
+| first_chunk_mut | ✅ | `cast_array_perm_mut` |
+| split_first_chunk | ✅ | idem |
+| split_first_chunk_mut | ✅ | idem |
+| split_last_chunk | ✅ | idem |
+| split_last_chunk_mut | ✅ | idem |
+| last_chunk | ✅ | idem |
+| last_chunk_mut | ✅ | idem |
 | reverse | ✅ | |
 | as_chunks | ✅ | |
 | as_chunks_mut | ✅ | |

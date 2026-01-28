@@ -349,7 +349,7 @@ impl<'a, T> DisjointOrEqual<'a, T> {
 #[ensures(result.len() == perm.len() / N@)]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
     ==> result.val()@[i]@[j] == perm.val()@[i * N@ + j])]
-pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
+pub fn cast_chunks_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }
 
@@ -365,8 +365,32 @@ pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*con
 #[ensures(perm.ward() == (^perm).ward())]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
     ==> (^result).val()@[i]@[j] == (^perm).val()@[i * N@ + j])]
-pub fn cast_array_perm_mut<const N: usize, T>(
+pub fn cast_chunks_perm_mut<const N: usize, T>(
     perm: &mut Perm<*const [T]>,
 ) -> &mut Perm<*const [[T; N]]> {
+    unreachable!("ghost code")
+}
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
+#[requires(perm.len() == N@)]
+#[ensures(*result.ward() == *perm.ward() as *const [T; N])]
+#[ensures(result.val()@ == perm.val()@)]
+pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [T; N]> {
+    unreachable!("ghost code")
+}
+
+#[allow(unused_variables)]
+#[trusted]
+#[check(ghost_trusted)]
+#[requires(perm.len() == N@)]
+#[ensures(*result.ward() == *perm.ward() as *const [T; N])]
+#[ensures(result.val()@ == perm.val()@)]
+#[ensures(perm.ward() == (^perm).ward())]
+#[ensures((^result).val()@ == (^perm).val()@)]
+pub fn cast_array_perm_mut<const N: usize, T>(
+    perm: &mut Perm<*const [T]>,
+) -> &mut Perm<*const [T; N]> {
     unreachable!("ghost code")
 }
