@@ -1165,17 +1165,21 @@ where
     }
 }
 
-#[trusted] // TODO
+#[requires(self_@.len() == other@.len())]
+#[ensures((^self_)@ == other@ && (^other)@ == self_@)]
 pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     assert!(
         self_.len() == other.len(),
         "destination and source slices have different lengths"
     );
+    let len = self_.len();
+    let (ptr1, perm1) = self_.as_mut_ptr_perm();
+    let (ptr2, perm2) = other.as_mut_ptr_perm();
     // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
     // checked to have the same length. The slices cannot overlap because
     // mutable references are exclusive.
     unsafe {
-        ptr::swap_nonoverlapping(self_.as_mut_ptr(), other.as_mut_ptr(), self_.len());
+        crate::ptr::swap_nonoverlapping(ptr1, ptr2, len, perm1, perm2);
     }
 }
 

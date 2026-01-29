@@ -42,8 +42,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | rotate_left | ❌ | |
 | rotate_right | ❌ | |
 | copy_from_slice | 🔧 | `copy_nonoverlapping` |
-| copy_within | ❌ | |
-| swap_with_slice | ❌ | |
+| copy_within | ❌ | Handle overlapping slices |
+| swap_with_slice | 🔧 | |
 | as_simd | ❌ | Needs spec for pointer cast |
 | as_simd_mut | ❌ | Needs spec for pointer cast |
 | get_disjoint_mut | ❌ | |
