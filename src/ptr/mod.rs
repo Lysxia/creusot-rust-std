@@ -424,7 +424,13 @@ pub const unsafe fn swap<T>(x: *mut T, y: *mut T) {
 #[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
 #[ensures(x as *const T == (^x_perm).ward().thin())]
 #[ensures(y as *const T == (^y_perm).ward().thin())]
-pub const unsafe fn swap_nonoverlapping<T>(x: *mut T, y: *mut T, count: usize, x_perm: Ghost<&mut Perm<*const [T]>>, y_perm: Ghost<&mut Perm<*const [T]>>) {
+pub const unsafe fn swap_nonoverlapping<T>(
+    x: *mut T,
+    y: *mut T,
+    count: usize,
+    x_perm: Ghost<&mut Perm<*const [T]>>,
+    y_perm: Ghost<&mut Perm<*const [T]>>,
+) {
     ub_checks::assert_unsafe_precondition!(
         check_library_ub,
         "ptr::swap_nonoverlapping requires that both pointer arguments are aligned and non-null \
@@ -445,14 +451,15 @@ pub const unsafe fn swap_nonoverlapping<T>(x: *mut T, y: *mut T, count: usize, x
     );
 
     const_eval_select!(
-        @capture[T] { x: *mut T, y: *mut T, count: usize }:
+        @capture[T] { x: *mut T, y: *mut T, count: usize, x_perm: Ghost<&mut Perm<*const [T]>>, y_perm: Ghost<&mut Perm<*const [T]>> }:
         if const {
             // At compile-time we want to always copy this in chunks of `T`, to ensure that if there
             // are pointers inside `T` we will copy them in one go rather than trying to copy a part
             // of a pointer (which would not work).
             // SAFETY: Same preconditions as this function
-            unsafe { swap_nonoverlapping_const(x, y, count) }
+            unsafe { swap_nonoverlapping_const(x, y, count, x_perm, y_perm) }
         } else {
+            let _ = (x_perm, y_perm);
             // Going though a slice here helps codegen know the size fits in `isize`
             let slice = std::ptr::slice_from_raw_parts_mut(x, count);
             // SAFETY: This is all readable from the pointer, meaning it's one
@@ -471,8 +478,18 @@ pub const unsafe fn swap_nonoverlapping<T>(x: *mut T, y: *mut T, count: usize, x
 #[inline]
 #[trusted]
 #[allow(unreachable_code, unused)]
-#[requires(false)]
-const unsafe fn swap_nonoverlapping_const<T>(x: *mut T, y: *mut T, count: usize) {
+#[requires(x as *const T == x_perm.ward().thin() && count@ == x_perm.len())]
+#[requires(y as *const T == y_perm.ward().thin() && count@ == y_perm.len())]
+#[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
+#[ensures(x as *const T == (^x_perm).ward().thin())]
+#[ensures(y as *const T == (^y_perm).ward().thin())]
+const unsafe fn swap_nonoverlapping_const<T>(
+    x: *mut T,
+    y: *mut T,
+    count: usize,
+    x_perm: Ghost<&mut Perm<*const [T]>>,
+    y_perm: Ghost<&mut Perm<*const [T]>>,
+) {
     let mut i = 0;
     while i < count {
         // SAFETY: By precondition, `i` is in-bounds because it's below `n`
