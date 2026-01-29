@@ -952,8 +952,7 @@ where
     }
 }
 
-#[trusted] // TODO
-#[requires(false)]
+#[requires(forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition((x, y)))]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
     F: FnMut(&mut T, &mut T) -> bool,
@@ -1020,9 +1019,12 @@ where
         return (self_, &mut []);
     }
 
-    let ptr = self_.as_mut_ptr();
+    let (ptr, mut perm) = self_.as_mut_ptr_perm();
+    let _perm = snapshot! { perm };
     let mut next_read: usize = 1;
     let mut next_write: usize = 1;
+
+    let _same_bucket = snapshot! { same_bucket };
 
     // SAFETY: the `while` condition guarantees `next_read` and `next_write`
     // are less than `len`, thus are inside `self`. `prev_ptr_write` points to
@@ -1041,13 +1043,30 @@ where
     // thus `next_read > next_write - 1` is too.
     unsafe {
         // Avoid bounds checks by using raw pointers.
+        #[invariant(perm.ward().thin() == ptr)]
+        #[invariant(perm.len() == len@)]
+        #[invariant(^perm == ^_perm)]
+        #[invariant(1 <= next_write@ && next_write@ <= next_read@ && next_read@ <= len@)]
+        #[invariant(_same_bucket.hist_inv(same_bucket))]
         while next_read < len {
-            let ptr_read = ptr.add(next_read);
-            let prev_ptr_write = ptr.add(next_write - 1);
-            if !same_bucket(&mut *ptr_read, &mut *prev_ptr_write) {
+            let (mut perm, live) = ghost! { perm.live_mut() }.split();
+            let (perm0, perm1) = ghost! { perm.split_at_mut(*Int::new(next_read as i128)) }.split();
+            let ptr_read = ptr.add_live(next_read, live);
+            let prev_ptr_write = ptr.add_live(next_write - 1, live);
+            let mut read_perm = ghost! { perm1.into_inner().index_mut(0int) };
+            let (prev_write_perm, write_perm) = ghost! { perm0.into_inner().split_at_mut(*Int::new(next_write as i128 - 1)).1.split_at_mut(1int) }.split();
+            let prev_write_perm = ghost! { prev_write_perm.into_inner().index_mut(0int) };
+            if !same_bucket(
+                Perm::as_mut(ptr_read, ghost! { *read_perm }),
+                Perm::as_mut(prev_ptr_write, prev_write_perm),
+            ) {
                 if next_read != next_write {
-                    let ptr_write = prev_ptr_write.add(1);
-                    mem::swap(&mut *ptr_read, &mut *ptr_write);
+                    let ptr_write = prev_ptr_write.add_live(1, live);
+                    let write_perm = ghost! { write_perm.into_inner().index_mut(0int) };
+                    mem::swap(
+                        Perm::as_mut(ptr_read, read_perm),
+                        Perm::as_mut(ptr_write, write_perm),
+                    );
                 }
                 next_write += 1;
             }
