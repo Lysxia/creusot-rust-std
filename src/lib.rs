@@ -16,7 +16,8 @@
     rustc_allow_const_fn_unstable,
     slice_range,
     get_disjoint_mut_helpers,
-    ptr_cast_array
+    ptr_cast_array,
+    layout_for_ptr
 )]
 pub mod intrinsics;
 pub mod ops;

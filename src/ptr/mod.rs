@@ -1,7 +1,14 @@
-use crate::{intrinsics, ub_checks};
+use crate::{
+    intrinsics::{self, const_eval_select},
+    ub_checks,
+};
 use ::core::mem::SizedTypeProperties as _;
 use core::hint::assert_unchecked as assume;
 use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
+use std::{
+    mem::{self, MaybeUninit},
+    num::NonZero,
+};
 mod const_ptr;
 mod mut_ptr;
 
@@ -338,6 +345,228 @@ impl<'a, T> DisjointOrEqual<'a, T> {
             DisjointOrEqual::Equal(p) => p,
             DisjointOrEqual::Disjoint(_, p) => p,
         }
+    }
+}
+
+/// Swaps the values at two mutable locations of the same type, without
+/// deinitializing either.
+///
+/// But for the following exceptions, this function is semantically
+/// equivalent to [`mem::swap`]:
+///
+/// * It operates on raw pointers instead of references. When references are
+///   available, [`mem::swap`] should be preferred.
+///
+/// * The two pointed-to values may overlap. If the values do overlap, then the
+///   overlapping region of memory from `x` will be used. This is demonstrated
+///   in the second example below.
+///
+/// * The operation is "untyped" in the sense that data may be uninitialized or otherwise violate
+///   the requirements of `T`. The initialization state is preserved exactly.
+///
+/// # Safety
+///
+/// Behavior is undefined if any of the following conditions are violated:
+///
+/// * Both `x` and `y` must be valid for both reads and writes. They must remain valid even when the
+///   other pointer is written. (This means if the memory ranges overlap, the two pointers must not
+///   be subject to aliasing restrictions relative to each other.)
+///
+/// * Both `x` and `y` must be properly aligned.
+///
+/// Note that even if `T` has size `0`, the pointers must be properly aligned.
+#[inline]
+#[trusted]
+#[allow(unreachable_code, unused)]
+#[requires(false)]
+pub const unsafe fn swap<T>(x: *mut T, y: *mut T) {
+    // Give ourselves some scratch space to work with.
+    // We do not have to worry about drops: `MaybeUninit` does nothing when dropped.
+    let mut tmp = MaybeUninit::<T>::uninit();
+
+    // Perform the swap
+    // SAFETY: the caller must guarantee that `x` and `y` are
+    // valid for writes and properly aligned. `tmp` cannot be
+    // overlapping either `x` or `y` because `tmp` was just allocated
+    // on the stack as a separate allocation.
+    unsafe {
+        copy_nonoverlapping(x, tmp.as_mut_ptr(), 1, todo!(), todo!());
+        copy(y, x, 1); // `x` and `y` may overlap
+        copy_nonoverlapping(tmp.as_ptr(), y, 1, todo!(), todo!());
+    }
+}
+
+/// Swaps `count * size_of::<T>()` bytes between the two regions of memory
+/// beginning at `x` and `y`. The two regions must *not* overlap.
+///
+/// The operation is "untyped" in the sense that data may be uninitialized or otherwise violate the
+/// requirements of `T`. The initialization state is preserved exactly.
+///
+/// # Safety
+///
+/// Behavior is undefined if any of the following conditions are violated:
+///
+/// * Both `x` and `y` must be valid for both reads and writes of `count *
+///   size_of::<T>()` bytes.
+///
+/// * Both `x` and `y` must be properly aligned.
+///
+/// * The region of memory beginning at `x` with a size of `count *
+///   size_of::<T>()` bytes must *not* overlap with the region of memory
+///   beginning at `y` with the same size.
+///
+/// Note that even if the effectively copied size (`count * size_of::<T>()`) is `0`,
+/// the pointers must be properly aligned.
+#[inline]
+#[trusted]
+#[requires(x as *const T == x_perm.ward().thin() && count@ == x_perm.len())]
+#[requires(y as *const T == y_perm.ward().thin() && count@ == y_perm.len())]
+#[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
+#[ensures(x as *const T == (^x_perm).ward().thin())]
+#[ensures(y as *const T == (^y_perm).ward().thin())]
+pub const unsafe fn swap_nonoverlapping<T>(x: *mut T, y: *mut T, count: usize, x_perm: Ghost<&mut Perm<*const [T]>>, y_perm: Ghost<&mut Perm<*const [T]>>) {
+    ub_checks::assert_unsafe_precondition!(
+        check_library_ub,
+        "ptr::swap_nonoverlapping requires that both pointer arguments are aligned and non-null \
+        and the specified memory ranges do not overlap",
+        pearlite! { false },
+        (
+            x: *mut () = x as *mut (),
+            y: *mut () = y as *mut (),
+            size: usize = size_of::<T>(),
+            align: usize = align_of::<T>(),
+            count: usize = count,
+        ) => {
+            let zero_size = size == 0 || count == 0;
+            ub_checks::maybe_is_aligned_and_not_null(x, align, zero_size)
+                && ub_checks::maybe_is_aligned_and_not_null(y, align, zero_size)
+                && ub_checks::maybe_is_nonoverlapping(x, y, size, count)
+        }
+    );
+
+    const_eval_select!(
+        @capture[T] { x: *mut T, y: *mut T, count: usize }:
+        if const {
+            // At compile-time we want to always copy this in chunks of `T`, to ensure that if there
+            // are pointers inside `T` we will copy them in one go rather than trying to copy a part
+            // of a pointer (which would not work).
+            // SAFETY: Same preconditions as this function
+            unsafe { swap_nonoverlapping_const(x, y, count) }
+        } else {
+            // Going though a slice here helps codegen know the size fits in `isize`
+            let slice = std::ptr::slice_from_raw_parts_mut(x, count);
+            // SAFETY: This is all readable from the pointer, meaning it's one
+            // allocation, and thus cannot be more than isize::MAX bytes.
+            let bytes = unsafe { mem::size_of_val_raw::<[T]>(slice) };
+            if let Some(bytes) = NonZero::new(bytes) {
+                // SAFETY: These are the same ranges, just expressed in a different
+                // type, so they're still non-overlapping.
+                unsafe { swap_nonoverlapping_bytes(x.cast(), y.cast(), bytes) };
+            }
+        }
+    )
+}
+
+/// Same behavior and safety conditions as [`swap_nonoverlapping`]
+#[inline]
+#[trusted]
+#[allow(unreachable_code, unused)]
+#[requires(false)]
+const unsafe fn swap_nonoverlapping_const<T>(x: *mut T, y: *mut T, count: usize) {
+    let mut i = 0;
+    while i < count {
+        // SAFETY: By precondition, `i` is in-bounds because it's below `n`
+        let x = unsafe { x.add(i) };
+        // SAFETY: By precondition, `i` is in-bounds because it's below `n`
+        // and it's distinct from `x` since the ranges are non-overlapping
+        let y = unsafe { y.add(i) };
+
+        // SAFETY: we're only ever given pointers that are valid to read/write,
+        // including being aligned, and nothing here panics so it's drop-safe.
+        unsafe {
+            // Note that it's critical that these use `copy_nonoverlapping`,
+            // rather than `read`/`write`, to avoid #134713 if T has padding.
+            let mut temp = MaybeUninit::<T>::uninit();
+            copy_nonoverlapping(x, temp.as_mut_ptr(), 1, todo!(), todo!());
+            copy_nonoverlapping(y, x, 1, todo!(), todo!());
+            copy_nonoverlapping(temp.as_ptr(), y, 1, todo!(), todo!());
+        }
+
+        i += 1;
+    }
+}
+
+// Don't let MIR inline this, because we really want it to keep its noalias metadata
+// #[rustc_no_mir_inline]
+#[inline]
+#[trusted]
+#[requires(false)]
+fn swap_chunk<const N: usize>(x: &mut MaybeUninit<[u8; N]>, y: &mut MaybeUninit<[u8; N]>) {
+    let a = *x;
+    let b = *y;
+    *x = b;
+    *y = a;
+}
+
+#[inline]
+#[trusted]
+#[requires(false)]
+unsafe fn swap_nonoverlapping_bytes(x: *mut u8, y: *mut u8, bytes: NonZero<usize>) {
+    // Same as `swap_nonoverlapping::<[u8; N]>`.
+    unsafe fn swap_nonoverlapping_chunks<const N: usize>(
+        x: *mut MaybeUninit<[u8; N]>,
+        y: *mut MaybeUninit<[u8; N]>,
+        chunks: NonZero<usize>,
+    ) {
+        let chunks = chunks.get();
+        for i in 0..chunks {
+            // SAFETY: i is in [0, chunks) so the adds and dereferences are in-bounds.
+            unsafe { swap_chunk(&mut *x.add(i), &mut *y.add(i)) };
+        }
+    }
+
+    // Same as `swap_nonoverlapping_bytes`, but accepts at most 1+2+4=7 bytes
+    #[inline]
+    unsafe fn swap_nonoverlapping_short(x: *mut u8, y: *mut u8, bytes: NonZero<usize>) {
+        // Tail handling for auto-vectorized code sometimes has element-at-a-time behaviour,
+        // see <https://github.com/rust-lang/rust/issues/134946>.
+        // By swapping as different sizes, rather than as a loop over bytes,
+        // we make sure not to end up with, say, seven byte-at-a-time copies.
+
+        let bytes = bytes.get();
+        let mut i = 0;
+        macro_rules! swap_prefix {
+            ($($n:literal)+) => {$(
+                if (bytes & $n) != 0 {
+                    // SAFETY: `i` can only have the same bits set as those in bytes,
+                    // so these `add`s are in-bounds of `bytes`.  But the bit for
+                    // `$n` hasn't been set yet, so the `$n` bytes that `swap_chunk`
+                    // will read and write are within the usable range.
+                    unsafe { swap_chunk::<$n>(&mut*x.add(i).cast(), &mut*y.add(i).cast()) };
+                    i |= $n;
+                }
+            )+};
+        }
+        swap_prefix!(4 2 1);
+        debug_assert_eq!(i, bytes);
+    }
+
+    const CHUNK_SIZE: usize = size_of::<*const ()>();
+    let bytes = bytes.get();
+
+    let chunks = bytes / CHUNK_SIZE;
+    let tail = bytes % CHUNK_SIZE;
+    if let Some(chunks) = NonZero::new(chunks) {
+        // SAFETY: this is bytes/CHUNK_SIZE*CHUNK_SIZE bytes, which is <= bytes,
+        // so it's within the range of our non-overlapping bytes.
+        unsafe { swap_nonoverlapping_chunks::<CHUNK_SIZE>(x.cast(), y.cast(), chunks) };
+    }
+    if let Some(tail) = NonZero::new(tail) {
+        const { assert!(CHUNK_SIZE <= 8) };
+        let delta = chunks * CHUNK_SIZE;
+        // SAFETY: the tail length is below CHUNK SIZE because of the remainder,
+        // and CHUNK_SIZE is at most 8 by the const assert, so tail <= 7
+        unsafe { swap_nonoverlapping_short(x.add(delta), y.add(delta), tail) };
     }
 }
 
