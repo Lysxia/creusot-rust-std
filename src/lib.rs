@@ -17,6 +17,7 @@
     slice_range,
     get_disjoint_mut_helpers,
     ptr_cast_array,
+    fmt_arguments_from_str,
     layout_for_ptr
 )]
 pub mod intrinsics;

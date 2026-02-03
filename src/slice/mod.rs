@@ -154,8 +154,8 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
         ) => a < len && b < len,
     );
 
-    let (ptr, perm) = self_.as_mut_ptr_perm();
-    let (mut perm, live) = ghost! { perm.into_inner().live_mut() }.split();
+    let (ptr, mut perm) = self_.as_mut_ptr_perm();
+    let live = ghost! { perm.live_mut() };
     let perm = ghost! {
         if a == b {
             let a_ = Int::new(a as i128).into_inner();
@@ -296,7 +296,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
     let (ptr, perm) = self_.as_mut_ptr_perm();
-    let (perm, live) = ghost! { perm.into_inner().live_mut() }.split();
+    let live = ghost! { perm.live_mut() };
     let (perm0, perm1) = ghost! {
         perm.into_inner().split_at_mut(*Int::new(mid as i128))
     }
@@ -1049,7 +1049,7 @@ where
         #[invariant(1 <= next_write@ && next_write@ <= next_read@ && next_read@ <= len@)]
         #[invariant(_same_bucket.hist_inv(same_bucket))]
         while next_read < len {
-            let (mut perm, live) = ghost! { perm.live_mut() }.split();
+            let live = ghost! { perm.live_mut() };
             let (perm0, perm1) = ghost! { perm.split_at_mut(*Int::new(next_read as i128)) }.split();
             let ptr_read = ptr.add_live(next_read, live);
             let prev_ptr_write = ptr.add_live(next_write - 1, live);

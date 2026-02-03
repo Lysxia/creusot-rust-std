@@ -2,10 +2,10 @@ use super::PtrAddExt;
 use crate::intrinsics::const_eval_select;
 use crate::ub_checks;
 use core::mem::SizedTypeProperties;
-use creusot_std::{prelude::*, std, std::ptr::PtrLive};
+use creusot_std::{prelude::*, std::ptr::PtrLive};
 
 impl<T> PtrAddExt<T> for *mut T {
-    #[requires(count == 0usize || live.contains(self as *const T) && live.contains((self as *const T).offset_logic(count@)))]
+    #[requires(live.contains_range(self as *const T, count@))]
     #[ensures(result as *const T == (self as *const T).offset_logic(count@))]
     #[erasure(<*mut T>::add)]
     unsafe fn add_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self {
@@ -43,12 +43,12 @@ impl<T> PtrAddExt<T> for *mut T {
         );
 
         // SAFETY: the caller must uphold the safety contract for `offset`.
-        unsafe { std::intrinsics::add_live_mut(self, count, live) }
+        unsafe { crate::intrinsics::add_live_mut(self, count, live) }
     }
 
     /// It would be more general to add `count == 0usize || ...` to the `requires`,
     /// but it breaks some proofs in `reverse`.
-    #[requires(live.contains(self as *const T) && live.contains((self as *const T).offset_logic(- count@)))]
+    #[requires(live.contains_range(self as *const T, - count@))]
     #[ensures(result as *const T == (self as *const T).offset_logic(- count@))]
     #[erasure(<*mut T>::sub)]
     /* pub const */
@@ -95,7 +95,7 @@ impl<T> PtrAddExt<T> for *mut T {
             // Because the pointee is *not* a ZST, that means that `count` is
             // at most `isize::MAX`, and thus the negation cannot overflow.
             unsafe {
-                std::intrinsics::offset_live_mut(
+                crate::intrinsics::offset_live_mut(
                     self,
                     crate::intrinsics::unchecked_sub_isize(0, count as isize),
                     live,
