@@ -2,7 +2,7 @@
 pub use ::core::intrinsics::const_eval_select;
 #[cfg(creusot)]
 use creusot_std::std::ptr::metadata_logic;
-use creusot_std::{ghost::perm::Perm, prelude::*};
+use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
 
 // Intrinsics: we specialize all the intrinsics to usize so that
 // we can specify them.
@@ -184,6 +184,42 @@ pub unsafe fn copy_nonoverlapping<T>(
 ) {
     let _ = (src_perm, dst_perm);
     unsafe { core::intrinsics::copy_nonoverlapping(src, dst, count) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(live.contains_range(dst, offset@))]
+#[ensures(result == dst.offset_logic(offset@))]
+pub unsafe fn add_live<T>(dst: *const T, offset: usize, live: Ghost<PtrLive<T>>) -> *const T {
+    let _ = live;
+    unsafe { core::intrinsics::offset(dst, offset) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(live.contains_range(dst, offset@))]
+#[ensures(result == dst.offset_logic(offset@))]
+pub unsafe fn offset_live<T>(dst: *const T, offset: isize, live: Ghost<PtrLive<T>>) -> *const T {
+    let _ = live;
+    unsafe { core::intrinsics::offset(dst, offset) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(live.contains_range(dst, offset@))]
+#[ensures(result == dst.offset_logic(offset@))]
+pub unsafe fn add_live_mut<T>(dst: *mut T, offset: usize, live: Ghost<PtrLive<T>>) -> *mut T {
+    let _ = live;
+    unsafe { core::intrinsics::offset(dst, offset) }
+}
+
+#[trusted]
+#[erasure(core::intrinsics::offset)]
+#[requires(live.contains_range(dst, offset@))]
+#[ensures(result == dst.offset_logic(offset@))]
+pub unsafe fn offset_live_mut<T>(dst: *mut T, offset: isize, live: Ghost<PtrLive<T>>) -> *mut T {
+    let _ = live;
+    unsafe { core::intrinsics::offset(dst, offset) }
 }
 
 pub(crate) macro const_eval_select {

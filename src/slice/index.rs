@@ -12,7 +12,7 @@ use crate::ops;
 #[cfg(creusot)]
 use core::ops::Bound;
 use core::range;
-use creusot_std::{ghost::perm::Perm, prelude::*, std, std::ops::RangeBounds, std::ptr::PtrLive};
+use creusot_std::{ghost::perm::Perm, prelude::*, std::ops::RangeBounds, std::ptr::PtrLive};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -95,8 +95,7 @@ const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_noubcheck)]
-#[requires(live.contains(ptr.thin()))]
-#[requires(live.contains(ptr.thin().offset_logic(offset@ + len@)))]
+#[requires(live.contains_range(ptr.thin(), offset@ + len@))]
 #[ensures(result.thin() == ptr.thin().offset_logic(offset@))]
 #[ensures(result.len_logic() == len)]
 unsafe fn get_offset_len_noubcheck<T>(
@@ -107,14 +106,13 @@ unsafe fn get_offset_len_noubcheck<T>(
 ) -> *const [T] {
     let ptr = ptr as *const T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { std::intrinsics::add_live(ptr, offset, live) };
+    let ptr = unsafe { crate::intrinsics::add_live(ptr, offset, live) };
     crate::intrinsics::aggregate_raw_ptr_slice(ptr, len)
 }
 
 #[inline(always)]
 #[erasure(private core::slice::index::get_offset_len_mut_noubcheck)]
-#[requires(live.contains(ptr.thin()))]
-#[requires(live.contains(ptr.thin().offset_logic(offset@ + len@)))]
+#[requires(live.contains_range(ptr.thin(), offset@ + len@))]
 #[ensures(result.thin() == ptr.thin().offset_logic(offset@))]
 #[ensures(result.len_logic() == len)]
 unsafe fn get_offset_len_mut_noubcheck<T>(
@@ -125,7 +123,7 @@ unsafe fn get_offset_len_mut_noubcheck<T>(
 ) -> *mut [T] {
     let ptr = ptr as *mut T;
     // SAFETY: The caller already checked these preconditions
-    let ptr = unsafe { std::intrinsics::add_live_mut(ptr, offset, live) };
+    let ptr = unsafe { crate::intrinsics::add_live_mut(ptr, offset, live) };
     crate::intrinsics::aggregate_raw_ptr_mut_slice(ptr, len)
 }
 
@@ -684,13 +682,9 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         {
             // SAFETY: `self` is checked to be valid and in bounds above.
             unsafe {
-                let (ptr, mut perm) = Perm::from_mut(slice);
-                let ptr = get_offset_len_mut_noubcheck(
-                    ptr,
-                    self.start,
-                    new_len,
-                    ghost! { perm.live_mut().1 },
-                );
+                let (ptr, perm) = Perm::from_mut(slice);
+                let ptr =
+                    get_offset_len_mut_noubcheck(ptr, self.start, new_len, ghost! { perm.live() });
                 let perm = ghost! { ptr_perm_slice_mut(perm, self.start, self.end).into_inner() };
                 Perm::as_mut(ptr, perm)
             }
@@ -1003,7 +997,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
         unsafe {
             let new_len = crate::intrinsics::unchecked_sub(slice.len(), self.start);
             let (slice, perm) = Perm::from_mut(slice);
-            let (perm, live) = ghost! { perm.into_inner().live_mut() }.split();
+            let live = ghost! { perm.live_mut() };
             let ptr = get_offset_len_mut_noubcheck(slice, self.start, new_len, live);
             let perm = ghost! {
                 let (_, perm) = perm.into_inner().split_at_mut(*Int::new(self.start as i128));
