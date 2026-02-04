@@ -28,7 +28,7 @@ pub trait PtrAddExt<T> {
     /// >   In particular, this range must not “wrap around” the edge of the address space.
     ///
     #[requires(false)]
-    unsafe fn add_live(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
+    unsafe fn add_live_(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
 
     #[requires(false)]
     unsafe fn sub_live(self, offset: usize, perm: Ghost<PtrLive<T>>) -> Self;
