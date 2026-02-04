@@ -170,7 +170,7 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
 
     // SAFETY: caller has to guarantee that `a < self.len()` and `b < self.len()`
     unsafe {
-        vptr::swap_disjoint(ptr.add_live(a, live), ptr.add_live(b, live), perm);
+        vptr::swap_disjoint(ptr.add_live_(a, live), ptr.add_live_(b, live), perm);
     }
 }
 
@@ -277,7 +277,7 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
         (
             from_raw_parts_perm(ptr, mid, perm0),
             from_raw_parts_perm(
-                ptr.add_live(mid, ghost! { perm0.live() }),
+                ptr.add_live_(mid, ghost! { perm0.live() }),
                 unchecked_sub(len, mid),
                 perm1,
             ),
@@ -316,7 +316,7 @@ unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &
     unsafe {
         (
             from_raw_parts_mut_perm(ptr, mid, perm0),
-            from_raw_parts_mut_perm(ptr.add_live(mid, live), unchecked_sub(len, mid), perm1),
+            from_raw_parts_mut_perm(ptr.add_live_(mid, live), unchecked_sub(len, mid), perm1),
         )
     }
 }
@@ -662,7 +662,7 @@ pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*
     let len = self_.len(); // Get the length before borrowing `self_`
     let (start, perm) = self_.as_mut_ptr_perm();
     // SAFETY: See as_ptr_range() above for why `add` here is safe.
-    let end = unsafe { start.add_live(len, ghost! { perm.live() }) };
+    let end = unsafe { start.add_live_(len, ghost! { perm.live() }) };
     (start..end, perm)
 }
 
@@ -1051,8 +1051,8 @@ where
         while next_read < len {
             let live = ghost! { perm.live_mut() };
             let (perm0, perm1) = ghost! { perm.split_at_mut(*Int::new(next_read as i128)) }.split();
-            let ptr_read = ptr.add_live(next_read, live);
-            let prev_ptr_write = ptr.add_live(next_write - 1, live);
+            let ptr_read = ptr.add_live_(next_read, live);
+            let prev_ptr_write = ptr.add_live_(next_write - 1, live);
             let mut read_perm = ghost! { perm1.into_inner().index_mut(0int) };
             let (prev_write_perm, write_perm) = ghost! { perm0.into_inner().split_at_mut(*Int::new(next_write as i128 - 1)).1.split_at_mut(1int) }.split();
             let prev_write_perm = ghost! { prev_write_perm.into_inner().index_mut(0int) };
@@ -1061,7 +1061,7 @@ where
                 Perm::as_mut(prev_ptr_write, prev_write_perm),
             ) {
                 if next_read != next_write {
-                    let ptr_write = prev_ptr_write.add_live(1, live);
+                    let ptr_write = prev_ptr_write.add_live_(1, live);
                     let write_perm = ghost! { write_perm.into_inner().index_mut(0int) };
                     mem::swap(
                         Perm::as_mut(ptr_read, read_perm),
