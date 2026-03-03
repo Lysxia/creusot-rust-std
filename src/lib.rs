@@ -1,5 +1,6 @@
 #![allow(internal_features)]
 #![feature(
+    bound_copied,
     new_range_api,
     sized_type_properties,
     portable_simd,
@@ -13,7 +14,6 @@
     const_eval_select,
     slice_swap_unchecked,
     slice_index_methods,
-    rustc_allow_const_fn_unstable,
     slice_range,
     get_disjoint_mut_helpers,
     ptr_cast_array,

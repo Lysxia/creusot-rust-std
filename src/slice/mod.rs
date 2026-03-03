@@ -1188,7 +1188,6 @@ pub fn as_simd<T, const LANES: usize>(self_: &[T]) -> (&[T], &[Simd<T, LANES>], 
 where
     Simd<T, LANES>: AsRef<[T; LANES]>,
     T: simd::SimdElement,
-    simd::LaneCount<LANES>: simd::SupportedLaneCount,
 {
     // These are expected to always match, as vector types are laid out like
     // arrays per <https://llvm.org/docs/LangRef.html#vector-type>, but we
@@ -1207,7 +1206,6 @@ pub fn as_simd_mut<T, const LANES: usize>(
 where
     Simd<T, LANES>: AsMut<[T; LANES]>,
     T: simd::SimdElement,
-    simd::LaneCount<LANES>: simd::SupportedLaneCount,
 {
     // These are expected to always match, as vector types are laid out like
     // arrays per <https://llvm.org/docs/LangRef.html#vector-type>, but we
