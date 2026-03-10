@@ -2,7 +2,7 @@ use creusot_std::prelude::*;
 
 pub macro const_panic {
     ($const_msg:literal, $runtime_msg:literal, $($arg:ident : $ty:ty = $val:expr),* $(,)?) => {{
-        #[trusted] // TODO: const_eval_select
+        #[trusted] // TODO: strings
         #[check(ghost_trusted)]
         #[requires(false)]
         const fn do_panic($($arg: $ty),*) -> ! {

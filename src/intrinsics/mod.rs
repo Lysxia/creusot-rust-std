@@ -222,8 +222,28 @@ pub unsafe fn offset_live_mut<T>(dst: *mut T, offset: isize, live: Ghost<PtrLive
     unsafe { core::intrinsics::offset(dst, offset) }
 }
 
+extern_spec! {
+    mod core {
+        mod intrinsics {
+            #[requires(_called_in_const.precondition(_arg))]
+            #[requires(_called_at_rt.precondition(_arg))]
+            #[ensures(_called_in_const.postcondition_once(_arg, result) || _called_at_rt.postcondition_once(_arg, result))]
+            fn const_eval_select<ARG, F, G, RET>(
+                _arg: ARG,
+                _called_in_const: F,
+                _called_at_rt: G,
+            ) -> RET
+            where
+                ARG: std::marker::Tuple,
+                G: FnOnce<ARG, Output = RET>,
+                F: const FnOnce<ARG, Output = RET>;
+        }
+    }
+}
+
 pub(crate) macro const_eval_select {
     (
+        $(#[$($attr:tt)*])*
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
         if const
             $(#[$compiletime_attr:meta])* $compiletime:block
@@ -232,6 +252,7 @@ pub(crate) macro const_eval_select {
     ) => {
         // Use the `noinline` arm, after adding explicit `inline` attributes
         $crate::intrinsics::const_eval_select!(
+            $(#[$($attr)*])*
             @capture$([$($binders)*])? { $($arg : $ty = $val),* } $(-> $ret)? :
             #[noinline]
             if const
@@ -246,6 +267,7 @@ pub(crate) macro const_eval_select {
     },
     // With a leading #[noinline], we don't add inline attributes
     (
+        $(#[$($attr:tt)*])*
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty = $val:expr),* $(,)? } $( -> $ret:ty )? :
         #[noinline]
         if const
@@ -254,11 +276,13 @@ pub(crate) macro const_eval_select {
             $(#[$runtime_attr:meta])* $runtime:block
     ) => {{
         $(#[$runtime_attr])*
+        $(#[$($attr)*])*
         fn runtime$(<$($binders)*>)?($($arg: $ty),*) $( -> $ret )? {
             $runtime
         }
 
         $(#[$compiletime_attr])*
+        $(#[$($attr)*])*
         const fn compiletime$(<$($binders)*>)?($($arg: $ty),*) $( -> $ret )? {
             // Don't warn if one of the arguments is unused.
             $(let _ = $arg;)*
@@ -271,6 +295,7 @@ pub(crate) macro const_eval_select {
     // We support leaving away the `val` expressions for *all* arguments
     // (but not for *some* arguments, that's too tricky).
     (
+        $(#[$($attr:tt)*])*
         @capture$([$($binders:tt)*])? { $($arg:ident : $ty:ty),* $(,)? } $( -> $ret:ty )? :
         if const
             $(#[$compiletime_attr:meta])* $compiletime:block
@@ -278,6 +303,7 @@ pub(crate) macro const_eval_select {
             $(#[$runtime_attr:meta])* $runtime:block
     ) => {
         $crate::intrinsics::const_eval_select!(
+            $(#[$($attr)*])*
             @capture$([$($binders)*])? { $($arg : $ty = $arg),* } $(-> $ret)? :
             if const
                 $(#[$compiletime_attr])* $compiletime
