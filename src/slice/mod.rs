@@ -101,7 +101,7 @@ pub fn block_get_2<T>(
 //     Write contracts specifying the safety precondition(s) that the caller must uphold, then
 //     Verify that if the caller respects those preconditions, the function does not cause undefined behavior.
 
-// #[erasure(<[T]>::get_unchecked::<I>)] TODO
+// #[erasure(<[T]>::get_unchecked::<I>)] // TODO trait erasure, assoc types
 #[requires(index.in_bounds(*self_))]
 #[ensures(index.slice_index(*self_, *result))]
 pub unsafe fn get_unchecked<T, I>(self_: &[T], index: I) -> &I::Output
@@ -892,7 +892,7 @@ pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T],
 }
 
 // Try to just prove safety for now
-// #[erasure(<[T]>::binary_search_by::<'a, F>)] // TODO: unsupported syntax
+#[erasure(<[T]>::binary_search_by::<'a, F>)]
 #[requires(forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition((&x,)))]
 pub fn binary_search_by<'a, T, F>(self_: &'a [T], mut f: F) -> Result<usize, usize>
 where
@@ -924,7 +924,7 @@ where
         // Binary search interacts poorly with branch prediction, so force
         // the compiler to use conditional moves if supported by the target
         // architecture.
-        base = select_unpredictable(cmp == Greater, base, mid);
+        base = std::hint::select_unpredictable(cmp == Greater, base, mid);
 
         // This is imprecise in the case where `size` is odd and the
         // comparison returns Greater: the mid element still gets included
@@ -1269,12 +1269,6 @@ pub fn as_flattened_mut<T, const N: usize>(self_: &mut [[T; N]]) -> &mut [T] {
     let perm = ghost! { cast_from_chunks_perm_mut(perm.into_inner()) };
     // SAFETY: `[T]` is layout-identical to `[T; N]`
     unsafe { from_raw_parts_mut_perm(ptr.cast(), len, perm) }
-}
-
-#[ensures(result == if b { true_val } else { false_val })]
-// from std::hint since 1.89
-fn select_unpredictable<T>(b: bool, true_val: T, false_val: T) -> T {
-    if b { true_val } else { false_val }
 }
 
 #[cfg_attr(not(creusot), derive(Debug))]

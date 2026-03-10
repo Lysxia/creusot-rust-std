@@ -1,5 +1,8 @@
 #![allow(internal_features)]
 #![feature(
+    const_trait_impl,
+    tuple_trait,
+    unboxed_closures,
     bound_copied,
     new_range_api,
     sized_type_properties,

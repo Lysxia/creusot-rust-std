@@ -35,24 +35,23 @@ macro_rules! assert_unsafe_precondition {
 pub use assert_unsafe_precondition;
 pub use core::intrinsics::ub_checks as check_library_ub;
 
-#[trusted] // TODO
 #[erasure(private core::ub_checks::check_language_ub)]
 pub(crate) fn check_language_ub() -> bool {
     // Only used for UB checks so we may const_eval_select.
-    core::intrinsics::ub_checks()
-        && const_eval_select!(
-            @capture { } -> bool:
-            if const {
-                // Always disable UB checks.
-                false
-            } else {
-                // Disable UB checks in Miri.
-                !cfg!(miri)
-            }
-        )
+    const_eval_select!(
+        @capture { } -> bool:
+        if const {
+            // Always disable UB checks.
+            false
+        } else {
+            // Disable UB checks in Miri.
+            !cfg!(miri)
+        }
+    ) && core::intrinsics::ub_checks()
 }
 
 #[erasure(private core::ub_checks::maybe_is_aligned_and_not_null)]
+#[requires(align != 0usize && align & (align - 1usize) == 0usize)]
 #[ensures(ptr.is_aligned_to_logic(align) && (is_zst || !ptr.is_null_logic()) ==> result)]
 pub(crate) const fn maybe_is_aligned_and_not_null(
     ptr: *const (),
@@ -63,12 +62,14 @@ pub(crate) const fn maybe_is_aligned_and_not_null(
     maybe_is_aligned(ptr, align) && (is_zst || !ptr.is_null())
 }
 
-#[trusted] // TODO: const_eval_select
 #[erasure(private core::ub_checks::maybe_is_aligned)]
+#[requires(align != 0usize && align & (align - 1usize) == 0usize)]
 #[ensures(ptr.is_aligned_to_logic(align) ==> result)]
 pub(crate) const fn maybe_is_aligned(ptr: *const (), align: usize) -> bool {
     // This is just for safety checks so we can const_eval_select.
     const_eval_select!(
+        #[requires(align != 0usize && align & (align - 1usize) == 0usize)]
+        #[ensures(|result| ptr.is_aligned_to_logic(align) ==> result)]
         @capture { ptr: *const (), align: usize } -> bool:
         if const {
             true
@@ -89,10 +90,9 @@ pub(crate) const fn is_valid_allocation_size(size: usize, len: usize) -> bool {
     len <= max_len
 }
 
-#[trusted]
 #[erasure(private core::ub_checks::maybe_is_nonoverlapping)]
 #[requires(size@ * count@ <= usize::MAX@)]
-#[ensures(src.addr_logic()@.abs_diff(dst.addr_logic()@) >= size@ * count@)]
+#[ensures(src.addr_logic()@.abs_diff(dst.addr_logic()@) >= size@ * count@ ==> result)]
 pub(crate) const fn maybe_is_nonoverlapping(
     src: *const (),
     dst: *const (),
@@ -101,6 +101,8 @@ pub(crate) const fn maybe_is_nonoverlapping(
 ) -> bool {
     // This is just for safety checks so we can const_eval_select.
     const_eval_select!(
+        #[requires(size@ * count@ <= usize::MAX@)]
+        #[ensures(|result| src.addr_logic()@.abs_diff(dst.addr_logic()@) >= size@ * count@ ==> result)]
         @capture { src: *const (), dst: *const (), size: usize, count: usize } -> bool:
         if const {
             true

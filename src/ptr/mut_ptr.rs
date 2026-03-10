@@ -9,14 +9,13 @@ impl<T> PtrAddExt<T> for *mut T {
     #[ensures(result as *const T == (self as *const T).offset_logic(count@))]
     #[erasure(<*mut T>::add)]
     unsafe fn add_live_(self, count: usize, live: Ghost<PtrLive<T>>) -> Self {
-        #[trusted]
-        // TODO
-        // #[cfg(debug_assertions)]
+        #[cfg(debug_assertions)]
         #[inline]
         // #[rustc_allow_const_fn_unstable(const_eval_select)]
-        #[ensures(result == (count@ * size@ <= isize::MAX@ && this.addr_logic()@ + count@ * size@ <= usize::MAX@))]
+        #[ensures(count@ * size@ <= isize::MAX@ && this.addr_logic()@ + count@ * size@ <= usize::MAX@ ==> result)]
         const fn runtime_add_nowrap(this: *const (), count: usize, size: usize) -> bool {
             const_eval_select!(
+                #[ensures(|result| count@ * size@ <= isize::MAX@ && this.addr_logic()@ + count@ * size@ <= usize::MAX@ ==> result)]
                 @capture { this: *const (), count: usize, size: usize } -> bool:
                 if const {
                     true
@@ -56,13 +55,13 @@ impl<T> PtrAddExt<T> for *mut T {
     where
         T: Sized,
     {
-        #[trusted]
         // #[cfg(debug_assertions)]
         #[inline]
         //#[rustc_allow_const_fn_unstable(const_eval_select)]
-        #[ensures(result == (count@ * size@ <= isize::MAX@ && this.addr_logic()@ >= count@ * size@))]
+        #[ensures(count@ * size@ <= isize::MAX@ && this.addr_logic()@ >= count@ * size@ ==> result)]
         const fn runtime_sub_nowrap(this: *const (), count: usize, size: usize) -> bool {
             const_eval_select!(
+                #[ensures(|result| count@ * size@ <= isize::MAX@ && this.addr_logic()@ >= count@ * size@ ==> result)]
                 @capture { this: *const (), count: usize, size: usize } -> bool:
                 if const {
                     true
