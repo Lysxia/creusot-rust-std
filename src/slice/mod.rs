@@ -348,8 +348,7 @@ pub fn align_to_offsets<T, U>(self_: &[T]) -> (usize, usize) {
 
     // Explicitly wrap the function call in a const block so it gets
     // constant-evaluated even in debug mode.
-    // let gcd: usize = const { gcd(size_of::<T>(), size_of::<U>()) };
-    let gcd: usize = gcd(size_of::<T>(), size_of::<U>());
+    let gcd: usize = const { gcd(size_of::<T>(), size_of::<U>()) };
     let ts: usize = size_of::<U>() / gcd;
     let us: usize = size_of::<T>() / gcd;
 
