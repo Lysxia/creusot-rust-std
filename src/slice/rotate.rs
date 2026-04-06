@@ -1,3 +1,4 @@
+use crate::ptr::PtrAddExt as _;
 use core::mem::MaybeUninit;
 use core::mem::SizedTypeProperties as _;
 use core::{cmp, ptr};
@@ -271,7 +272,6 @@ unsafe fn ptr_rotate_gcd<T>(
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted]
 #[erasure(private core::slice::rotate::ptr_rotate_swap)]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
@@ -281,23 +281,53 @@ unsafe fn ptr_rotate_swap<T>(
     mut left: usize,
     mut mid: *mut T,
     mut right: usize,
-    perm: Ghost<&mut Perm<*const [T]>>,
+    mut perm: Ghost<&mut Perm<*const [T]>>,
 ) {
+    let _perm0: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
+    let _left0: Snapshot<Int> = snapshot! { left@ };
+    #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
+    #[invariant(left@ + right@ == perm.len())]
+    #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
+        ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
     loop {
         if left >= right {
             // Algorithm 3
             // There is an alternate way of swapping that involves finding where the last swap
             // of this algorithm would be, and swapping using that last chunk instead of swapping
             // adjacent chunks like this algorithm is doing, but this way is still faster.
+            #[invariant(left >= right)]
+            #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
+            #[invariant(left@ + right@ == perm.len())]
+            #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
+                ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
             loop {
+                #[trusted]
+                proof_assert! {
+                    forall<p: *const T, q: *const T, i: Int>
+                        p.sub_logic(q.offset_logic(i)) == p.sub_logic(q) - i
+                };
+                let (mut perm01, perm2) = ghost! {
+                    perm.into_inner().split_at_mut(*Int::new(left as i128))
+                }
+                .split();
+                let mut perm1 = ghost! {
+                    perm01.split_at_mut(*Int::new((left - right) as i128)).1
+                };
                 // SAFETY:
                 // `left >= right` so `[mid-right, mid+right)` is valid for reading and writing
                 // Subtracting `right` from `mid` each turn is counterbalanced by the addition and
                 // check after it.
                 unsafe {
-                    ptr::swap_nonoverlapping(mid.sub(right), mid, right);
-                    mid = mid.sub(right);
+                    crate::ptr::swap_nonoverlapping(
+                        mid.sub_live(right, ghost! { perm1.live() }),
+                        mid,
+                        right,
+                        ghost! { *perm1 },
+                        perm2,
+                    );
+                    mid = mid.sub_live(right, ghost! { perm1.live() });
                 }
+                perm = perm01; // ghost
                 left -= right;
                 if left < right {
                     break;
@@ -305,15 +335,34 @@ unsafe fn ptr_rotate_swap<T>(
             }
         } else {
             // Algorithm 3, `left < right`
+            #[invariant(left <= right)]
+            #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
+            #[invariant(left@ + right@ == perm.len())]
+            #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
+                ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
             loop {
+                let (perm0, mut perm12) = ghost! {
+                    perm.into_inner().split_at_mut(*Int::new(left as i128))
+                }
+                .split();
+                let mut perm1 = ghost! {
+                    perm12.split_at_mut(*Int::new(left as i128)).0
+                };
                 // SAFETY: `[mid-left, mid+left)` is valid for reading and writing because
                 // `left < right` so `mid+left < mid+right`.
                 // Adding `left` to `mid` each turn is counterbalanced by the subtraction and check
                 // after it.
                 unsafe {
-                    ptr::swap_nonoverlapping(mid.sub(left), mid, left);
-                    mid = mid.add(left);
+                    crate::ptr::swap_nonoverlapping(
+                        mid.sub_live(left, ghost! { perm0.live() }),
+                        mid,
+                        left,
+                        perm0,
+                        ghost! { *perm1 },
+                    );
+                    mid = mid.add_live_(left, ghost! { perm1.live() });
                 }
+                perm = perm12; // ghost
                 right -= left;
                 if right < left {
                     break;
@@ -321,6 +370,10 @@ unsafe fn ptr_rotate_swap<T>(
             }
         }
         if (right == 0) || (left == 0) {
+            proof_assert! { forall<s: Seq<T>> s[s.len()..] == Seq::empty() };
+            proof_assert! { forall<s: Seq<T>> s[..s.len()] == s };
+            proof_assert! { forall<s: Seq<T>> Seq::empty().concat(s) == s };
+            proof_assert! { forall<s: Seq<T>> s.concat(Seq::empty()) == s };
             return;
         }
     }
