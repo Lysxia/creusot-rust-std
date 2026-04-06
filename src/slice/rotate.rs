@@ -175,7 +175,7 @@ unsafe fn ptr_rotate_gcd<T>(
     // around 16. 24 was chosen as middle ground. If the size of `T` is larger than 4
     // `usize`s, this algorithm also outperforms other algorithms.
     // SAFETY: callers must ensure `mid - left` is valid for reading and writing.
-    let x = unsafe { mid.sub(left) };
+    let x = unsafe { mid.sub_live(left, ghost! { perm.live() }) };
     // beginning of first round
     // SAFETY: see previous comment.
     let mut tmp: T = unsafe { x.read() };
@@ -254,6 +254,21 @@ unsafe fn ptr_rotate_gcd<T>(
         }
     }
 }
+
+#[trusted]
+#[erasure(<*mut T>::replace)]
+#[requires(src as *const T == *perm.ward())]
+#[ensures(dst == *(^perm).val())]
+#[ensures(result == *perm.val())]
+unsafe fn replace_perm<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
+    unsafe { src.replace(dst) }
+}
+
+// #[trusted]
+// #[erasure(<*mut T>::read)]
+// unsafe fn read_perm<T>(p: *mut T, perm: Ghost<&Perm<*const T>>) -> T {
+//     todo!()
+// }
 
 /// Algorithm 3 utilizes repeated swapping of `min(left, right)` elements.
 ///
