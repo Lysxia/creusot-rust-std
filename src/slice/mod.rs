@@ -892,7 +892,7 @@ pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T],
 
 // Try to just prove safety for now
 #[erasure(<[T]>::binary_search_by::<'a, F>)]
-#[requires(forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition((&x,)))]
+#[requires(|mode| forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition(mode, (&x,)))]
 pub fn binary_search_by<'a, T, F>(self_: &'a [T], mut f: F) -> Result<usize, usize>
 where
     F: FnMut(&'a T) -> Ordering,
@@ -951,7 +951,7 @@ where
     }
 }
 
-#[requires(forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition((x, y)))]
+#[requires(|mode| forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition(mode, (x, y)))]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
     F: FnMut(&mut T, &mut T) -> bool,
@@ -1116,7 +1116,7 @@ where
     // #[cfg_attr(feature = "panic_immediate_abort", inline)]
     #[track_caller]
     #[allow(unused_variables)]
-    #[requires(false)]
+    #[requires(|mode| mode.nopanic() ==> false)]
     const fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
         // const_panic!(
         //     "copy_from_slice: source slice length does not match destination slice length",

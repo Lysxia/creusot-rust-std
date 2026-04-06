@@ -49,7 +49,7 @@ where
 #[track_caller]
 #[check(ghost)]
 #[erasure(private core::slice::index::slice_index_fail)]
-#[requires(false)]
+#[requires(|mode| !mode.nopanic())]
 const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
     if start > len {
         const_panic!(
@@ -251,7 +251,7 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &T) -> &Self::Output;
 
@@ -259,7 +259,7 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]

@@ -225,9 +225,9 @@ pub unsafe fn offset_live_mut<T>(dst: *mut T, offset: isize, live: Ghost<PtrLive
 extern_spec! {
     mod core {
         mod intrinsics {
-            #[requires(_called_in_const.precondition(_arg))]
-            #[requires(_called_at_rt.precondition(_arg))]
-            #[ensures(_called_in_const.postcondition_once(_arg, result) || _called_at_rt.postcondition_once(_arg, result))]
+            #[requires(|mode| _called_in_const.precondition(mode, _arg))]
+            #[requires(|mode| _called_at_rt.precondition(mode, _arg))]
+            #[ensures(|result, mode| _called_in_const.postcondition_once(mode, _arg, result) || _called_at_rt.postcondition_once(mode, _arg, result))]
             fn const_eval_select<ARG, F, G, RET>(
                 _arg: ARG,
                 _called_in_const: F,
