@@ -1,7 +1,7 @@
 use core::mem::MaybeUninit;
 use core::mem::SizedTypeProperties as _;
 use core::{cmp, ptr};
-use creusot_std::prelude::*;
+use creusot_std::{ghost::perm::Perm, prelude::*};
 
 type BufType = [usize; 32];
 
@@ -12,10 +12,20 @@ type BufType = [usize; 32];
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted] // TODO
+#[erasure(private core::slice::rotate::ptr_rotate)]
+#[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
+#[requires(left@ + right@ == perm.len())]
+#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
 #[inline]
-pub(super) unsafe fn ptr_rotate<T>(left: usize, mid: *mut T, right: usize) {
+pub(super) unsafe fn ptr_rotate<T>(
+    left: usize,
+    mid: *mut T,
+    right: usize,
+    perm: Ghost<&mut Perm<*const [T]>>,
+) {
     if T::IS_ZST {
+        #[trusted]
+        proof_assert!(false);
         return;
     }
     // abort early if the rotate is a no-op

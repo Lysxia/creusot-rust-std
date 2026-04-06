@@ -1076,29 +1076,33 @@ where
     self_.split_at_mut(next_write)
 }
 
-#[trusted] // TODO
+#[erasure(<[T]>::rotate_left)]
+#[requires(|mode| mode.nopanic() ==> mid@ <= self_@.len())]
+#[ensures((^self_)@ == (*self_)@[mid@..].concat((*self_)@[..mid@]))]
 pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     assert!(mid <= self_.len());
     let k = self_.len() - mid;
-    let p = self_.as_mut_ptr();
+    let (p, perm) = self_.as_mut_ptr_perm();
 
     // SAFETY: The range `[p.add(mid) - mid, p.add(mid) + k)` is trivially
     // valid for reading and writing, as required by `ptr_rotate`.
     unsafe {
-        rotate::ptr_rotate(mid, p.add(mid), k);
+        rotate::ptr_rotate(mid, p.add_live_(mid, ghost! { perm.live() }), k, perm);
     }
 }
 
-#[trusted] // TODO
+#[erasure(<[T]>::rotate_right)]
+#[requires(|mode| mode.nopanic() ==> k@ <= self_@.len())]
+#[ensures((^self_)@ == (*self_)@[self_@.len() - k@..].concat((*self_)@[..self_@.len() - k@]))]
 pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     assert!(k <= self_.len());
     let mid = self_.len() - k;
-    let p = self_.as_mut_ptr();
+    let (p, perm) = self_.as_mut_ptr_perm();
 
     // SAFETY: The range `[p.add(mid) - mid, p.add(mid) + k)` is trivially
     // valid for reading and writing, as required by `ptr_rotate`.
     unsafe {
-        rotate::ptr_rotate(mid, p.add(mid), k);
+        rotate::ptr_rotate(mid, p.add_live_(mid, ghost! { perm.live() }), k, perm);
     }
 }
 
