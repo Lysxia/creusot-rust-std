@@ -771,7 +771,7 @@ fn cons_suffix_of<T>(b: Snapshot<Seq<T>>, i: Int) {
 fn snoc_prefix<T>() {}
 
 #[erasure(<[T]>::as_chunks::<N>)]
-#[requires(N@ != 0)]
+#[requires(|mode| mode.nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() / N@)]
 #[ensures(result.1@.len() == self_@.len() % N@)]
 #[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
@@ -796,7 +796,7 @@ pub fn as_chunks<T, const N: usize>(self_: &[T]) -> (&[[T; N]], &[T]) {
 }
 
 #[erasure(<[T]>::as_rchunks::<N>)]
-#[requires(N@ != 0)]
+#[requires(|mode| mode.nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() % N@)]
 #[ensures(result.1@.len() == self_@.len() / N@)]
 #[ensures(forall<i> 0 <= i && i < self_@.len() % N@
@@ -822,7 +822,7 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
 }
 
 #[erasure(<[T]>::as_chunks_mut::<N>)]
-#[requires(N@ != 0)]
+#[requires(|mode| mode.nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() / N@)]
 #[ensures(result.1@.len() == self_@.len() % N@)]
 #[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
@@ -1103,7 +1103,7 @@ pub fn rotate_right<T>(self_: &mut [T], k: usize) {
 }
 
 // #[erasure(<[T]>::copy_from_slice)] // TODO: reordered self.len()
-#[requires(self_@.len() == src@.len())]
+#[requires(|mode| mode.nopanic() ==> self_@.len() == src@.len())]
 #[ensures((^self_)@ == src@)]
 /* pub const */
 pub fn copy_from_slice<T>(self_: &mut [T], src: &[T])
@@ -1164,7 +1164,7 @@ where
     }
 }
 
-#[requires(self_@.len() == other@.len())]
+#[requires(|mode| mode.nopanic() ==> self_@.len() == other@.len())]
 #[ensures((^self_)@ == other@ && (^other)@ == self_@)]
 pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     assert!(
