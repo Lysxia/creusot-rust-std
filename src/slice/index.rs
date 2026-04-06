@@ -251,7 +251,7 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &T) -> &Self::Output;
 
@@ -259,7 +259,7 @@ pub unsafe trait SliceIndex<T: ?Sized>: private_slice_index::Sealed {
     /// if out of bounds.
     // #[unstable(feature = "slice_index_methods", issue = "none")]
     #[track_caller]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -650,7 +650,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[inline(always)]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index)]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         // Using checked_sub is a safe way to get `SubUnchecked` in MIR
@@ -672,7 +672,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[inline]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index_mut)]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -963,7 +963,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         if self.start > slice.len() {
@@ -985,7 +985,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -1498,7 +1498,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
 
     #[inline]
     // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)] // TODO
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         let Self {
@@ -1525,7 +1525,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
 
     #[inline]
     // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)] // TODO
-    #[requires(self.in_bounds(*slice))]
+    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
