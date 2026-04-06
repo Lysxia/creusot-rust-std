@@ -1,9 +1,21 @@
 use core::mem::MaybeUninit;
 use core::mem::SizedTypeProperties as _;
 use core::{cmp, ptr};
+#[cfg(creusot)]
+use creusot_std::std::mem::size_of_logic;
 use creusot_std::{ghost::perm::Perm, prelude::*};
 
 type BufType = [usize; 32];
+
+extern_spec! {
+    mod core {
+        mod intrinsics {
+            #[check(terminates)]
+            #[ensures(result@ == size_of_logic::<T>())]
+            fn size_of<T>() -> usize;
+        }
+    }
+}
 
 /// Rotates the range `[mid-left, mid+right)` such that the element at `mid` becomes the first
 /// element. Equivalently, rotates the range `left` elements to the left or `right` elements to the
@@ -12,7 +24,7 @@ type BufType = [usize; 32];
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[erasure(private core::slice::rotate::ptr_rotate)]
+// #[erasure(private core::slice::rotate::ptr_rotate)] // TODO: erase flag()
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
 #[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
@@ -37,15 +49,15 @@ pub(super) unsafe fn ptr_rotate<T>(
         && cmp::min(left, right) <= size_of::<BufType>() / size_of::<T>()
     {
         // SAFETY: guaranteed by the caller
-        unsafe { ptr_rotate_memmove(left, mid, right) };
+        unsafe { ptr_rotate_memmove(left, mid, right, perm) };
     } else if flag(!cfg!(feature = "optimize_for_size"))
         && ((left + right < 24) || (size_of::<T>() > size_of::<[usize; 4]>()))
     {
         // SAFETY: guaranteed by the caller
-        unsafe { ptr_rotate_gcd(left, mid, right) }
+        unsafe { ptr_rotate_gcd(left, mid, right, perm) }
     } else {
         // SAFETY: guaranteed by the caller
-        unsafe { ptr_rotate_swap(left, mid, right) }
+        unsafe { ptr_rotate_swap(left, mid, right, perm) }
     }
 }
 
@@ -62,10 +74,18 @@ fn flag(b: bool) -> bool {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
+#[trusted]
+#[erasure(private core::slice::rotate::ptr_rotate_memmove)]
 #[inline]
-#[trusted] // TODO
-#[requires(false)]
-unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
+#[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
+#[requires(left@ + right@ == perm.len())]
+#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
+unsafe fn ptr_rotate_memmove<T>(
+    left: usize,
+    mid: *mut T,
+    right: usize,
+    perm: Ghost<&mut Perm<*const [T]>>,
+) {
     // The `[T; 0]` here is to ensure this is appropriately aligned for T
     let mut rawarray = MaybeUninit::<(BufType, [T; 0])>::uninit();
     let buf = rawarray.as_mut_ptr() as *mut T;
@@ -136,9 +156,18 @@ unsafe fn ptr_rotate_memmove<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted] // TODO
+#[trusted]
+#[erasure(private core::slice::rotate::ptr_rotate_gcd)]
+#[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
+#[requires(left@ + right@ == perm.len())]
+#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
 #[inline]
-unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
+unsafe fn ptr_rotate_gcd<T>(
+    left: usize,
+    mid: *mut T,
+    right: usize,
+    perm: Ghost<&mut Perm<*const [T]>>,
+) {
     // Algorithm 2
     // Microbenchmarks indicate that the average performance for random shifts is better all
     // the way until about `left + right == 32`, but the worst case performance breaks even
@@ -242,9 +271,18 @@ unsafe fn ptr_rotate_gcd<T>(left: usize, mid: *mut T, right: usize) {
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted] // TODO
+#[trusted]
+#[erasure(private core::slice::rotate::ptr_rotate_swap)]
+#[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
+#[requires(left@ + right@ == perm.len())]
+#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
 #[inline]
-unsafe fn ptr_rotate_swap<T>(mut left: usize, mut mid: *mut T, mut right: usize) {
+unsafe fn ptr_rotate_swap<T>(
+    mut left: usize,
+    mut mid: *mut T,
+    mut right: usize,
+    perm: Ghost<&mut Perm<*const [T]>>,
+) {
     loop {
         if left >= right {
             // Algorithm 3
