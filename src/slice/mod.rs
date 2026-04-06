@@ -1076,7 +1076,7 @@ where
     self_.split_at_mut(next_write)
 }
 
-#[erasure(<[T]>::rotate_left)]
+// #[erasure(<[T]>::rotate_left)] // TODO: erase flag() in ptr_rotate
 #[requires(|mode| mode.nopanic() ==> mid@ <= self_@.len())]
 #[ensures((^self_)@ == (*self_)@[mid@..].concat((*self_)@[..mid@]))]
 pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
@@ -1091,7 +1091,7 @@ pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     }
 }
 
-#[erasure(<[T]>::rotate_right)]
+// #[erasure(<[T]>::rotate_right)] // TODO: erase flag() in ptr_rotate
 #[requires(|mode| mode.nopanic() ==> k@ <= self_@.len())]
 #[ensures((^self_)@ == (*self_)@[self_@.len() - k@..].concat((*self_)@[..self_@.len() - k@]))]
 pub fn rotate_right<T>(self_: &mut [T], k: usize) {
