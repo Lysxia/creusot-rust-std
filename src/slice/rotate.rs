@@ -301,7 +301,8 @@ unsafe fn ptr_rotate_swap<T>(
             #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
                 ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
             loop {
-                #[trusted]
+                let _perm: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
+                #[trusted] // TODO: move to creusot-std
                 proof_assert! {
                     forall<p: *const T, q: *const T, i: Int>
                         p.sub_logic(q.offset_logic(i)) == p.sub_logic(q) - i
@@ -328,7 +329,16 @@ unsafe fn ptr_rotate_swap<T>(
                     mid = mid.sub_live(right, ghost! { perm1.live() });
                 }
                 perm = perm01; // ghost
+                let _left = snapshot! { left@ };
                 left -= right;
+                proof_assert! { perm.val()@[..left@] == _perm.val()@[..left@] };
+                proof_assert! { perm.val()@[left@..] == _perm.val()@[left@ + right@..] };
+                proof_assert! { (^_perm).val()@[left@ + right@..] == _perm.val()@[left@..left@ + right@] };
+                proof_assert! { (^_perm).val()@[..left@ + right@] == (^perm).val()@ };
+                proof_assert! {
+                    (^_perm).val()@[..*_left] == perm.val()@[left@..].concat(perm.val()@[..left@])
+                    ==> (^_perm).val()@ == (*_perm).val()@[*_left..].concat((*_perm).val()@[..*_left])
+                }
                 if left < right {
                     break;
                 }
@@ -341,6 +351,7 @@ unsafe fn ptr_rotate_swap<T>(
             #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
                 ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
             loop {
+                let _perm: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
                 let (perm0, mut perm12) = ghost! {
                     perm.into_inner().split_at_mut(*Int::new(left as i128))
                 }
@@ -364,6 +375,14 @@ unsafe fn ptr_rotate_swap<T>(
                 }
                 perm = perm12; // ghost
                 right -= left;
+                proof_assert! { perm.val()@[..left@] == _perm.val()@[..left@] };
+                proof_assert! { perm.val()@[left@..] == _perm.val()@[left@ + left@..] };
+                proof_assert! { (^_perm).val()@[..left@] == _perm.val()@[left@..left@ + left@] };
+                proof_assert! { (^_perm).val()@[left@..] == (^perm).val()@ };
+                proof_assert! {
+                    (^_perm).val()@[left@..] == perm.val()@[left@..].concat(perm.val()@[..left@])
+                    ==> (^_perm).val()@ == (*_perm).val()@[left@..].concat((*_perm).val()@[..left@])
+                }
                 if right < left {
                     break;
                 }

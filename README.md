@@ -37,10 +37,10 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | as_rchunks | ✅ | |
 | split_at_checked | ✅ | |
 | split_at_mut_checked | ✅ | |
-| binary_search_by | 🔧 | TODO: how to reason about the safety of function arguments |
+| binary_search_by | ✅ | TODO: Safety of function arguments |
 | partition_dedup_by | ✅ | |
-| rotate_left | ❌ | |
-| rotate_right | ❌ | |
+| rotate_left | 🔧 | |
+| rotate_right | 🔧 | |
 | copy_from_slice | 🔧 | `copy_nonoverlapping` |
 | copy_within | ❌ | Handle overlapping slices |
 | swap_with_slice | 🔧 | |
