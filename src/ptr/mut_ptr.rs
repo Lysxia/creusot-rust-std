@@ -88,6 +88,8 @@ impl<T> PtrAddExt<T> for *mut T {
 
         if T::IS_ZST {
             // Pointer arithmetic does nothing when the pointee is a ZST.
+            #[trusted]
+            proof_assert! { self as *const T == (self as *const T).offset_logic(- count@) }
             self
         } else {
             // SAFETY: the caller must uphold the safety contract for `offset`.

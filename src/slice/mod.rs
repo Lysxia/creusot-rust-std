@@ -18,12 +18,12 @@ use creusot_std::{
     std::ops::RangeBounds,
 };
 // use core::num::NonZero;
-use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeInclusive};
-// use core::panic::const_panic;
+use crate::panic::const_panic;
 use crate::{
     assert_unsafe_precondition,
     ptr::{self as vptr, PtrAddExt as _},
 };
+use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeInclusive};
 use core::simd::{self, Simd};
 use core::{hint /* range, */, ptr};
 
@@ -1122,13 +1122,12 @@ where
     #[allow(unused_variables)]
     #[requires(|mode| mode.nopanic() ==> false)]
     const fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
-        // const_panic!(
-        //     "copy_from_slice: source slice length does not match destination slice length",
-        //     "copy_from_slice: source slice length ({src_len}) does not match destination slice length ({dst_len})",
-        //     src_len: usize,
-        //     dst_len: usize,
-        // )
-        panic!()
+        const_panic!(
+            "copy_from_slice: source slice length does not match destination slice length",
+            "copy_from_slice: source slice length ({src_len}) does not match destination slice length ({dst_len})",
+            src_len: usize,
+            dst_len: usize,
+        )
     }
 
     if self_.len() != src.len() {

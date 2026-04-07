@@ -391,7 +391,7 @@ pub const unsafe fn swap<T>(x: *mut T, y: *mut T) {
     // on the stack as a separate allocation.
     unsafe {
         copy_nonoverlapping(x, tmp.as_mut_ptr(), 1, todo!(), todo!());
-        copy(y, x, 1); // `x` and `y` may overlap
+        copy_perm(y, x, 1, todo!()); // `x` and `y` may overlap
         copy_nonoverlapping(tmp.as_ptr(), y, 1, todo!(), todo!());
     }
 }
@@ -614,9 +614,10 @@ unsafe fn swap_nonoverlapping_bytes(x: *mut u8, y: *mut u8, bytes: NonZero<usize
 /// `0`, the pointers must be properly aligned.
 #[trusted] // TODO
 #[erasure(core::ptr::copy::<T>)]
-#[requires(false)]
+#[requires(src == perm.source() && dst as *const T == perm.dest())]
+// WIP: how to make this sound for non-Copy types?
 /* pub const */
-pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
+pub unsafe fn copy_perm<T>(src: *const T, dst: *mut T, count: usize, perm: Ghost<CopyPerm<T>>) {
     // SAFETY: the safety contract for `copy` must be upheld by the caller.
     unsafe {
         ub_checks::assert_unsafe_precondition!(
@@ -634,6 +635,35 @@ pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
                 && ub_checks::maybe_is_aligned_and_not_null(dst, align, zero_size)
         );
         crate::intrinsics::copy(src, dst, count)
+    }
+}
+
+pub enum CopyPerm<'a, T> {
+    /// Permissions over disjoint ranges
+    Disjoint(&'a Perm<*const [T]>, &'a mut Perm<*const [T]>),
+    /// A single range, with offsets for the source and destination
+    Overlap(&'a mut Perm<*const [T]>, usize, usize),
+}
+
+impl<T> CopyPerm<'_, T> {
+    #[logic(open)]
+    pub fn source(self) -> *const T {
+        pearlite! {
+            match self {
+                CopyPerm::Disjoint(src, _) => src.ward().thin(),
+                CopyPerm::Overlap(perm, src_ofs, _) => perm.ward().thin().offset_logic(src_ofs@),
+            }
+        }
+    }
+
+    #[logic(open)]
+    pub fn dest(self) -> *const T {
+        pearlite! {
+            match self {
+                CopyPerm::Disjoint(_, dst) => dst.ward().thin(),
+                CopyPerm::Overlap(perm, _, dst_ofs) => perm.ward().thin().offset_logic(dst_ofs@),
+            }
+        }
     }
 }
 
