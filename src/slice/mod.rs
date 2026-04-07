@@ -669,7 +669,7 @@ pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*
 #[ensures((^self_)@ == self_@.reverse())]
 /* pub const */
 pub fn reverse<T>(self_: &mut [T]) {
-    let _old = snapshot! { self_@ };
+    let _self: Snapshot<&mut [T]> = snapshot! { self_ };
     let len = self_.len();
     let half_len = len / 2;
     let (Range { start, end }, perm) = as_mut_ptr_range(self_);
@@ -695,17 +695,13 @@ pub fn reverse<T>(self_: &mut [T]) {
                 raw::from_raw_parts_mut_perm(end.sub_live(half_len, ghost! { perm2.live() }), half_len, perm2),
             )
         };
-
-    proof_assert! { *_old == front_half@.concat(_old[half_len@..len@ - half_len@]).concat(back_half@) };
-    proof_assert! { len@ - 2 * half_len@ == 0 || len@ - 2 * half_len@ == 1 };
-    proof_assert! { _old[half_len@ .. len@ - half_len@].reverse() == _old[half_len@ .. len@ - half_len@] };
-    ghost! { reverse_concat::<T>() };
-    proof_assert! { (*_old).reverse() == back_half@.reverse().concat(_old[half_len@..len@ - half_len@]).concat(front_half@.reverse()) };
-
+    let _front = snapshot!(front_half);
+    let _back = snapshot!(back_half);
     // Introducing a function boundary here means that the two halves
     // get `noalias` markers, allowing better optimization as LLVM
     // knows that they're disjoint, unlike in the original slice.
     revswap(front_half, back_half, half_len);
+    ghost! { reverse_lemma(_self, _front, _back) };
 
     #[inline]
     #[requires(n@ == a@.len() && n@ == b@.len())]
@@ -744,6 +740,21 @@ pub fn reverse<T>(self_: &mut [T]) {
             i += 1;
         }
     }
+}
+
+#[check(ghost)]
+#[requires(self_@.len() - front@.len() - back@.len() <= 1)]
+#[requires(self_@ == front@.concat(self_@[front@.len()..self_@.len() - back@.len()]).concat(back@))]
+#[requires((^self_)@ == (^front)@.concat(self_@[front@.len()..self_@.len() - back@.len()]).concat((^back)@))]
+#[requires((^front)@ == back@.reverse() && (^back)@ == front@.reverse())]
+#[ensures((^self_)@ == self_@.reverse())]
+fn reverse_lemma<T>(
+    self_: Snapshot<&mut [T]>,
+    front: Snapshot<&mut [T]>,
+    back: Snapshot<&mut [T]>,
+) {
+    let _ = (self_, front, back);
+    reverse_concat::<T>()
 }
 
 #[check(ghost)]
