@@ -783,3 +783,36 @@ pub fn cast_array_perm_mut<const N: usize, T>(
 ) -> &mut Perm<*const [T; N]> {
     unreachable!("ghost code")
 }
+
+#[trusted]
+#[check(terminates)]
+#[erasure(<*const T>::read)]
+#[open_inv_result]
+#[requires(inv(perm))]
+#[requires(src == *perm.ward())]
+#[ensures(result.0 == *perm.val())]
+#[ensures((^perm).ward() == perm.ward() && result.1.ward() == perm.ward())]
+#[ensures((^perm).val() == (^result.1).val())]
+pub unsafe fn read<T>(
+    src: *const T,
+    perm: Ghost<&mut Perm<*const T>>,
+) -> (T, Ghost<&mut Perm<*const T>>) {
+    let _ = perm;
+    unsafe { (core::ptr::read(src), Ghost::conjure()) }
+}
+
+#[trusted]
+#[check(terminates)]
+#[erasure(<*mut T>::write)]
+#[requires(inv(src))]
+#[requires(dst as *const T == *perm.ward())]
+#[ensures(*(^perm).val() == src)]
+#[ensures(inv(^perm))]
+pub unsafe fn write<T>(
+    dst: *mut T,
+    src: T,
+    #[cfg_attr(creusot, creusot::open_inv)] perm: Ghost<&mut Perm<*const T>>,
+) {
+    let _ = perm;
+    unsafe { core::ptr::write(dst, src) }
+}
