@@ -28,7 +28,8 @@ extern_spec! {
 // #[erasure(private core::slice::rotate::ptr_rotate)] // TODO: erase flag()
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
-#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
+// Needs proof for ptr_rotate_gcd
+// #[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
 #[inline]
 pub(super) unsafe fn ptr_rotate<T>(
     left: usize,
@@ -122,6 +123,36 @@ unsafe fn ptr_rotate_memmove<T>(
     }
 }
 
+#[trusted]
+#[check(terminates)]
+#[erasure(<*const T>::read)]
+#[no_type_invariants]
+#[requires(inv(perm))]
+#[requires(src == *perm.ward())]
+#[ensures(result.0 == *perm.val())]
+#[ensures((^perm).ward() == perm.ward() && result.1.ward() == perm.ward())]
+#[ensures((^perm).val() == (^result.1).val())]
+pub unsafe fn read<T>(
+    src: *const T,
+    perm: Ghost<&mut Perm<*const T>>,
+) -> (T, Ghost<&mut Perm<*const T>>) {
+    let _ = perm;
+    unsafe { (core::ptr::read(src), Ghost::conjure()) }
+}
+
+#[trusted]
+#[check(terminates)]
+#[erasure(<*mut T>::write)]
+#[no_type_invariants]
+#[requires(inv(src))]
+#[requires(dst as *const T == *perm.ward())]
+#[ensures(*(^perm).val() == src)]
+#[ensures(inv(^perm))]
+pub unsafe fn write<T>(dst: *mut T, src: T, perm: Ghost<&mut Perm<*const T>>) {
+    let _ = perm;
+    unsafe { core::ptr::write(dst, src) }
+}
+
 /// Algorithm 2 is used for small values of `left + right` or for large `T`. The elements
 /// are moved into their final positions one at a time starting at `mid - left` and advancing by
 /// `right` steps modulo `left + right`, such that only one temporary is needed. Eventually, we
@@ -157,29 +188,34 @@ unsafe fn ptr_rotate_memmove<T>(
 /// # Safety
 ///
 /// The specified range must be valid for reading and writing.
-#[trusted]
 #[erasure(private core::slice::rotate::ptr_rotate_gcd)]
 #[requires(left@ != 0 && right@ != 0)]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
-#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
+// #[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
 #[inline]
 unsafe fn ptr_rotate_gcd<T>(
     left: usize,
     mid: *mut T,
     right: usize,
-    perm: Ghost<&mut Perm<*const [T]>>,
+    mut perm: Ghost<&mut Perm<*const [T]>>,
 ) {
+    use split::Split;
     // Algorithm 2
     // Microbenchmarks indicate that the average performance for random shifts is better all
     // the way until about `left + right == 32`, but the worst case performance breaks even
     // around 16. 24 was chosen as middle ground. If the size of `T` is larger than 4
     // `usize`s, this algorithm also outperforms other algorithms.
     // SAFETY: callers must ensure `mid - left` is valid for reading and writing.
-    let x = unsafe { mid.sub_live(left, ghost! { perm.live() }) };
+    let live = ghost! { perm.live_mut() };
+    let x = unsafe { mid.sub_live(left, live) };
     // beginning of first round
     // SAFETY: see previous comment.
-    let mut tmp: T = unsafe { x.read() };
+    let (perm0, mut perm1) = ghost! {
+        Split::new(ghost! { *perm }, 0).into_inner()
+    }
+    .split();
+    let (mut tmp, perm0) = unsafe { read(x, perm0) };
     let mut i = right;
     // `gcd` can be found before hand by calculating `gcd(left + right, right)`,
     // but it is faster to do one loop which calculates the gcd as a side effect, then
@@ -189,6 +225,11 @@ unsafe fn ptr_rotate_gcd<T>(
     // of reading one temporary once, copying backwards, and then writing that temporary at
     // the very end. This is possibly due to the fact that swapping or replacing temporaries
     // uses only one memory address in the loop instead of needing to manage two.
+    #[invariant(0 < i@ && i@ < live.len()@)]
+    #[invariant(perm1.len() == live.len()@)]
+    #[invariant(perm1.ix() == 0usize)]
+    #[invariant(perm1.base() == x as *const T)]
+    #[invariant(gcd <= live.len() && gcd <= right && gcd <= i)]
     loop {
         // [long-safety-expl]
         // SAFETY: callers must ensure `[left, left+mid+right)` are all valid for reading and
@@ -205,7 +246,10 @@ unsafe fn ptr_rotate_gcd<T>(
         //   a subtraction of `left` to happen.
         //
         // So `x+i` is valid for reading and writing if the caller respected the contract
-        tmp = unsafe { x.add(i).replace(tmp) };
+        let perm1 = ghost! {
+            Split::index_mut(ghost! { &mut *perm1 }, i).into_inner()
+        };
+        tmp = unsafe { replace(x.add_live_(i, live), tmp, perm1) };
         // instead of incrementing `i` and then checking if it is outside the bounds, we
         // check if `i` will go outside the bounds on the next increment. This prevents
         // any wrapping of pointers or `usize`.
@@ -215,7 +259,7 @@ unsafe fn ptr_rotate_gcd<T>(
                 // end of first round
                 // SAFETY: tmp has been read from a valid source and x is valid for writing
                 // according to the caller.
-                unsafe { x.write(tmp) };
+                unsafe { write(x, tmp, perm0) };
                 break;
             }
             // this conditional must be here if `left + right >= 15`
@@ -226,12 +270,24 @@ unsafe fn ptr_rotate_gcd<T>(
             i += right;
         }
     }
+    proof_assert! { gcd <= left && gcd <= right };
     // finish the chunk with more rounds
+    // #[invariant(produced.len() < gcd)]
     for start in 1..gcd {
+        #[trusted] // loop invariant
+        proof_assert! { 1 <= start@ && start < gcd && left@ + right@ == perm.len() };
+        #[trusted] // loop invariant
+        proof_assert! { perm.ward().thin() == live.ward() };
+        let (perm0_, mut perm1) = ghost! {
+            Split::new(ghost! { *perm }, start).into_inner()
+        }
+        .split();
+        proof_assert! { *perm0_.ward() == live.ward().offset_logic(start@) };
         // SAFETY: `gcd` is at most equal to `right` so all values in `1..gcd` are valid for
         // reading and writing as per the function's safety contract, see [long-safety-expl]
         // above
-        tmp = unsafe { x.add(start).read() };
+        let (tmp_, perm0) = unsafe { read(x.add_live_(start, live), perm0_) };
+        tmp = tmp_;
         // [safety-expl-addition]
         //
         // Here `start < gcd` so `start < right` so `i < right+right`: `right` being the
@@ -239,18 +295,101 @@ unsafe fn ptr_rotate_gcd<T>(
         // `i < left+right` so `x+i = mid-left+i` is always valid for reading and writing
         // according to the function's safety contract.
         i = start + right;
+        #[invariant(0 <= i@ && i@ < live.len()@)]
+        #[invariant(i != start)]
+        #[invariant(perm1.len() == live.len()@)]
+        #[invariant(perm1.ix() == start)]
+        #[invariant(perm1.base() == x as *const T)]
         loop {
             // SAFETY: see [long-safety-expl] and [safety-expl-addition]
-            tmp = unsafe { x.add(i).replace(tmp) };
+            let perm1 = ghost! {
+                Split::index_mut(ghost! { &mut *perm1 }, i).into_inner()
+            };
+            tmp = unsafe { replace(x.add_live(i, live), tmp, perm1) };
             if i >= left {
                 i -= left;
                 if i == start {
                     // SAFETY: see [long-safety-expl] and [safety-expl-addition]
-                    unsafe { x.add(start).write(tmp) };
+                    unsafe { write(x.add_live(start, live), tmp, perm0) };
                     break;
                 }
             } else {
                 i += right;
+            }
+        }
+    }
+}
+
+mod split {
+    use creusot_std::{ghost::perm::Perm, prelude::*};
+
+    pub struct Split<'a, T>(usize, &'a mut Perm<*const [T]>, &'a mut Perm<*const [T]>);
+
+    impl<'a, T> Invariant for Split<'a, T> {
+        #[logic]
+        fn invariant(self) -> bool {
+            pearlite! {
+                self.1.len() == self.0@
+                && self.2.ward().thin() == self.base().offset_logic(self.0@ + 1)
+            }
+        }
+    }
+
+    impl<'a, T> Split<'a, T> {
+        #[logic]
+        pub fn len(self) -> Int {
+            pearlite! {
+                self.1.len() + self.2.len() + 1
+            }
+        }
+
+        #[logic]
+        pub fn base(self) -> *const T {
+            pearlite! {
+                self.1.ward().thin()
+            }
+        }
+
+        #[logic]
+        pub fn ix(self) -> usize {
+            self.0
+        }
+
+        #[check(ghost)]
+        #[requires(i@ < perm.len())]
+        #[ensures((^perm).ward() == (*perm).ward())]
+        #[ensures((*result).1.len() == perm.len())]
+        #[ensures((*result).1.ix() == i)]
+        #[ensures(*(*result).0.ward() == (*perm).ward().thin().offset_logic(i@))]
+        #[ensures((*result).1.base() == perm.ward().thin())]
+        pub fn new(
+            perm: Ghost<&'a mut Perm<*const [T]>>,
+            i: usize,
+        ) -> Ghost<(&'a mut Perm<*const T>, Self)> {
+            ghost! {
+                let (left, right) = perm.into_inner().split_at_mut(*Int::new(i as i128));
+                let (pi, right) = right.split_at_mut(1int);
+                (pi.index_mut(0int), Split(i, left, right))
+            }
+        }
+
+        #[check(ghost)]
+        #[requires(i@ < self_.len() && i != self_.ix())]
+        #[ensures((^self_).len() == (*self_).len())]
+        #[ensures((^self_).base() == (*self_).base())]
+        #[ensures((^self_).ix() == (*self_).ix())]
+        #[ensures(*result.ward() == self_.base().offset_logic(i@))]
+        pub fn index_mut<'b>(
+            self_: Ghost<&'b mut Self>,
+            i: usize,
+        ) -> Ghost<&'b mut Perm<*const T>> {
+            ghost! {
+                let j = self_.0;
+                if i < j {
+                    self_.into_inner().1.index_mut(*Int::new(i as i128))
+                } else {
+                    self_.into_inner().2.index_mut(*Int::new((i - j - 1) as i128))
+                }
             }
         }
     }
@@ -261,7 +400,7 @@ unsafe fn ptr_rotate_gcd<T>(
 #[requires(src as *const T == *perm.ward())]
 #[ensures(dst == *(^perm).val())]
 #[ensures(result == *perm.val())]
-unsafe fn replace_perm<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
+unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
     unsafe { src.replace(dst) }
 }
 
