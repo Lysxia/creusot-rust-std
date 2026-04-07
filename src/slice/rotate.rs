@@ -318,11 +318,6 @@ unsafe fn ptr_rotate_swap<T>(
                 ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
             loop {
                 let _perm: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
-                #[trusted] // TODO: move to creusot-std
-                proof_assert! {
-                    forall<p: *const T, q: *const T, i: Int>
-                        p.sub_logic(q.offset_logic(i)) == p.sub_logic(q) - i
-                };
                 let (mut perm01, perm2) = ghost! {
                     perm.into_inner().split_at_mut(*Int::new(left as i128))
                 }
