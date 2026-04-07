@@ -126,7 +126,7 @@ unsafe fn ptr_rotate_memmove<T>(
 #[trusted]
 #[check(terminates)]
 #[erasure(<*const T>::read)]
-#[no_type_invariants]
+#[open_inv_result]
 #[requires(inv(perm))]
 #[requires(src == *perm.ward())]
 #[ensures(result.0 == *perm.val())]
@@ -143,12 +143,15 @@ pub unsafe fn read<T>(
 #[trusted]
 #[check(terminates)]
 #[erasure(<*mut T>::write)]
-#[no_type_invariants]
 #[requires(inv(src))]
 #[requires(dst as *const T == *perm.ward())]
 #[ensures(*(^perm).val() == src)]
 #[ensures(inv(^perm))]
-pub unsafe fn write<T>(dst: *mut T, src: T, perm: Ghost<&mut Perm<*const T>>) {
+pub unsafe fn write<T>(
+    dst: *mut T,
+    src: T,
+    #[cfg_attr(creusot, creusot::open_inv)] perm: Ghost<&mut Perm<*const T>>,
+) {
     let _ = perm;
     unsafe { core::ptr::write(dst, src) }
 }
@@ -403,12 +406,6 @@ mod split {
 unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
     unsafe { src.replace(dst) }
 }
-
-// #[trusted]
-// #[erasure(<*mut T>::read)]
-// unsafe fn read_perm<T>(p: *mut T, perm: Ghost<&Perm<*const T>>) -> T {
-//     todo!()
-// }
 
 /// Algorithm 3 utilizes repeated swapping of `min(left, right)` elements.
 ///
