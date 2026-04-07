@@ -419,6 +419,7 @@ pub const unsafe fn swap<T>(x: *mut T, y: *mut T) {
 /// the pointers must be properly aligned.
 #[inline]
 #[trusted]
+#[erasure(core::ptr::swap_nonoverlapping)]
 #[requires(x as *const T == x_perm.ward().thin() && count@ == x_perm.len())]
 #[requires(y as *const T == y_perm.ward().thin() && count@ == y_perm.len())]
 #[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
@@ -786,15 +787,15 @@ pub fn cast_array_perm_mut<const N: usize, T>(
 
 #[trusted]
 #[check(terminates)]
-#[erasure(<*const T>::read)]
+#[erasure(<*mut T>::read)]
 #[open_inv_result]
 #[requires(inv(perm))]
-#[requires(src == *perm.ward())]
+#[requires(src as *const T == *perm.ward())]
 #[ensures(result.0 == *perm.val())]
 #[ensures((^perm).ward() == perm.ward() && result.1.ward() == perm.ward())]
 #[ensures((^perm).val() == (^result.1).val())]
 pub unsafe fn read<T>(
-    src: *const T,
+    src: *mut T,
     perm: Ghost<&mut Perm<*const T>>,
 ) -> (T, Ghost<&mut Perm<*const T>>) {
     let _ = perm;
