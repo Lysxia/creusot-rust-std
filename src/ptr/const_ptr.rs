@@ -46,10 +46,10 @@ impl<T> PtrAddExt<T> for *const T {
     }
 
     #[requires(live.contains_range(self, - count@))]
-    #[ensures(result == self.offset_logic(count@))]
+    #[ensures(result == self.offset_logic(- count@))]
     #[erasure(<*const T>::sub)]
     /* pub const */
-    unsafe fn sub_live(self, count: usize, live: Ghost<PtrLive<T>>) -> *const T
+    unsafe fn sub_live(self, count: usize, live: Ghost<PtrLive<T>>) -> Self
     where
         T: Sized,
     {
