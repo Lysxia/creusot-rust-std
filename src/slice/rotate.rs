@@ -325,31 +325,26 @@ unsafe fn ptr_rotate_swap<T>(
                 let mut perm1 = ghost! {
                     perm01.split_at_mut(*Int::new((left - right) as i128)).1
                 };
+                let live = ghost! { perm1.live_mut() };
+                ghost! { ptr_rotate_swap_lemma_for_sub_live(mid, right, &live) };
                 // SAFETY:
                 // `left >= right` so `[mid-right, mid+right)` is valid for reading and writing
                 // Subtracting `right` from `mid` each turn is counterbalanced by the addition and
                 // check after it.
                 unsafe {
                     crate::ptr::swap_nonoverlapping(
-                        mid.sub_live(right, ghost! { perm1.live() }),
+                        mid.sub_live(right, live),
                         mid,
                         right,
                         ghost! { *perm1 },
                         perm2,
                     );
-                    mid = mid.sub_live(right, ghost! { perm1.live() });
+                    mid = mid.sub_live(right, live);
                 }
                 perm = perm01; // ghost
-                let _left = snapshot! { left@ };
+                let _left = snapshot!(left);
                 left -= right;
-                proof_assert! { perm.val()@[..left@] == _perm.val()@[..left@] };
-                proof_assert! { perm.val()@[left@..] == _perm.val()@[left@ + right@..] };
-                proof_assert! { (^_perm).val()@[left@ + right@..] == _perm.val()@[left@..left@ + right@] };
-                proof_assert! { (^_perm).val()@[..left@ + right@] == (^perm).val()@ };
-                proof_assert! {
-                    (^_perm).val()@[..*_left] == perm.val()@[left@..].concat(perm.val()@[..left@])
-                    ==> (^_perm).val()@ == (*_perm).val()@[*_left..].concat((*_perm).val()@[..*_left])
-                }
+                ghost! { ptr_rotate_swap_lemma(left, *_left.into_ghost(), _perm, snapshot!(*perm)) };
                 if left < right {
                     break;
                 }
@@ -386,14 +381,7 @@ unsafe fn ptr_rotate_swap<T>(
                 }
                 perm = perm12; // ghost
                 right -= left;
-                proof_assert! { perm.val()@[..left@] == _perm.val()@[..left@] };
-                proof_assert! { perm.val()@[left@..] == _perm.val()@[left@ + left@..] };
-                proof_assert! { (^_perm).val()@[..left@] == _perm.val()@[left@..left@ + left@] };
-                proof_assert! { (^_perm).val()@[left@..] == (^perm).val()@ };
-                proof_assert! {
-                    (^_perm).val()@[left@..] == perm.val()@[left@..].concat(perm.val()@[..left@])
-                    ==> (^_perm).val()@ == (*_perm).val()@[left@..].concat((*_perm).val()@[..left@])
-                }
+                ghost! { ptr_rotate_swap_lemma2::<T>(left, _perm, snapshot!(*perm)) };
                 if right < left {
                     break;
                 }
@@ -407,4 +395,52 @@ unsafe fn ptr_rotate_swap<T>(
             return;
         }
     }
+}
+
+#[check(ghost)]
+#[requires(mid as *const T == live.ward().offset_logic(len@))]
+#[requires(len == live.len())]
+#[ensures(live.contains_range(mid as *const T, - len@))]
+fn ptr_rotate_swap_lemma_for_sub_live<T>(
+    mid: *mut T,
+    len: usize,
+    live: &Ghost<creusot_std::std::ptr::PtrLive<T>>,
+) {
+}
+
+#[check(ghost)]
+#[requires(left <= len && len@ == perm.len() && prev.len() == perm.len() + len@ - left@)]
+#[requires((^prev).len() == prev.len())]
+#[requires(perm.val()@[..left@] == prev.val()@[..left@])]
+#[requires(perm.val()@[left@..] == prev.val()@[len@..])]
+#[requires((^prev).val()@[len@..] == prev.val()@[left@..len@])]
+#[requires((^prev).val()@[..len@] == (^perm).val()@)]
+#[ensures((^perm).val()@ == perm.val()@[left@..].concat(perm.val()@[..left@])
+    ==> (^prev).val()@ == (*prev).val()@[len@..].concat((*prev).val()@[..len@]))]
+fn ptr_rotate_swap_lemma<T>(
+    left: usize,
+    len: usize,
+    prev: Snapshot<&mut Perm<*const [T]>>,
+    perm: Snapshot<&mut Perm<*const [T]>>,
+) {
+    let _ = (left, len, prev, perm);
+    proof_assert! { (^prev).val()@ == (^prev).val()@[..len@].concat((^prev).val()@[len@..]) }
+}
+
+#[check(ghost)]
+#[requires(left@ <= perm.len() && prev.len() == left@ + perm.len())]
+#[requires((^prev).len() == prev.len())]
+#[requires(perm.val()@[..left@] == prev.val()@[..left@])]
+#[requires(perm.val()@[left@..] == prev.val()@[left@ + left@..])]
+#[requires((^prev).val()@[..left@] == prev.val()@[left@..left@ + left@])]
+#[requires((^prev).val()@[left@..] == (^perm).val()@)]
+#[ensures((^perm).val()@ == perm.val()@[left@..].concat(perm.val()@[..left@])
+    ==> (^prev).val()@ == (*prev).val()@[left@..].concat((*prev).val()@[..left@]))]
+fn ptr_rotate_swap_lemma2<T>(
+    left: usize,
+    prev: Snapshot<&mut Perm<*const [T]>>,
+    perm: Snapshot<&mut Perm<*const [T]>>,
+) {
+    let _ = (left, prev, perm);
+    proof_assert! { (^prev).val()@ == (^prev).val()@[..left@].concat((^prev).val()@[left@..]) }
 }
