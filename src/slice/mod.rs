@@ -1240,6 +1240,7 @@ pub trait ArraySliceExt<T, const N: usize> {
 }
 
 #[erasure(<[[T; N]]>::as_flattened)]
+#[requires(self_@.len() * N@ <= usize::MAX@)] // TODO: How to guarantee this when T is not a ZST?
 #[ensures(result@ == self_@.flat_map(|chunk: [T; N]| chunk@))]
 pub fn as_flattened<T, const N: usize>(self_: &[[T; N]]) -> &[T] {
     let len = if T::IS_ZST {
@@ -1251,11 +1252,13 @@ pub fn as_flattened<T, const N: usize>(self_: &[[T; N]]) -> &[T] {
     };
     let (ptr, perm) = self_.as_ptr_perm();
     let perm = ghost! { cast_from_chunks_perm(perm.into_inner()) };
+    snapshot! { len_flat_map_const::<T, N> };
     // SAFETY: `[T]` is layout-identical to `[T; N]`
     unsafe { from_raw_parts_perm(ptr.cast(), len, perm) }
 }
 
 #[erasure(<[[T; N]]>::as_flattened_mut)]
+#[requires(self_@.len() * N@ <= usize::MAX@)] // TODO: How to guarantee this when T is not a ZST?
 #[ensures(result@ == self_@.flat_map(|chunk: [T; N]| chunk@))]
 #[ensures((^self_)@.len() == self_@.len())]
 #[ensures(forall<i> 0 <= i && i < self_@.len() ==> (^self_)@[i]@ == (^result)@[N@ * i..N@ * i + N@])]
@@ -1269,8 +1272,21 @@ pub fn as_flattened_mut<T, const N: usize>(self_: &mut [[T; N]]) -> &mut [T] {
     };
     let (ptr, perm) = self_.as_mut_ptr_perm();
     let perm = ghost! { cast_from_chunks_perm_mut(perm.into_inner()) };
+    snapshot! { len_flat_map_const::<T, N> };
     // SAFETY: `[T]` is layout-identical to `[T; N]`
     unsafe { from_raw_parts_mut_perm(ptr.cast(), len, perm) }
+}
+
+// The length of a `flat_map` of constant size chunks
+// is the product of the chunk size and the number of chunks.
+#[logic]
+#[requires(forall<i> 0 <= i && i < s.len() ==> s[i]@.len() == N@)]
+#[ensures(s.flat_map(|chunk: [T; N]| chunk@).len() == s.len() * N@)]
+#[variant(s.len())]
+fn len_flat_map_const<T, const N: usize>(s: Seq<[T; N]>) {
+    if s.len() != 0 {
+        len_flat_map_const(s[1..]);
+    }
 }
 
 #[cfg_attr(not(creusot), derive(Debug))]
