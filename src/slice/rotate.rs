@@ -159,6 +159,7 @@ unsafe fn ptr_rotate_memmove<T>(
 /// The specified range must be valid for reading and writing.
 #[trusted]
 #[erasure(private core::slice::rotate::ptr_rotate_gcd)]
+#[requires(left@ != 0 && right@ != 0)]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
 #[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
