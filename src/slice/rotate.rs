@@ -195,11 +195,12 @@ unsafe fn ptr_rotate_gcd<T>(
     // of reading one temporary once, copying backwards, and then writing that temporary at
     // the very end. This is possibly due to the fact that swapping or replacing temporaries
     // uses only one memory address in the loop instead of needing to manage two.
+    #[invariant(inv(tmp))]
     #[invariant(0 < i@ && i@ < live.len()@)]
     #[invariant(perm1.len() == live.len()@)]
     #[invariant(perm1.ix() == 0usize)]
     #[invariant(perm1.base() == x as *const T)]
-    #[invariant(gcd <= live.len() && gcd <= right && gcd <= i)]
+    #[invariant(0usize < gcd && gcd <= right && gcd <= i)]
     loop {
         // [long-safety-expl]
         // SAFETY: callers must ensure `[left, left+mid+right)` are all valid for reading and
@@ -242,12 +243,12 @@ unsafe fn ptr_rotate_gcd<T>(
     }
     proof_assert! { gcd <= left && gcd <= right };
     // finish the chunk with more rounds
-    // #[invariant(produced.len() < gcd)]
-    for start in 1..gcd {
-        #[trusted] // loop invariant
-        proof_assert! { 1 <= start@ && start < gcd && left@ + right@ == perm.len() };
-        #[trusted] // loop invariant
-        proof_assert! { perm.ward().thin() == live.ward() };
+    // FIXME(const-hack): Use `for start in 1..gcd` when available in const
+    let mut start = 1;
+    #[invariant(1usize <= start && start <= gcd)]
+    #[invariant(left@ + right@ == perm.len())]
+    #[invariant(perm.ward().thin() == live.ward())]
+    while start < gcd {
         let (perm0_, mut perm1) = ghost! {
             Split::new(ghost! { *perm }, start).into_inner()
         }
@@ -265,6 +266,7 @@ unsafe fn ptr_rotate_gcd<T>(
         // `i < left+right` so `x+i = mid-left+i` is always valid for reading and writing
         // according to the function's safety contract.
         i = start + right;
+        #[invariant(inv(tmp))]
         #[invariant(0 <= i@ && i@ < live.len()@)]
         #[invariant(i != start)]
         #[invariant(perm1.len() == live.len()@)]
@@ -287,6 +289,7 @@ unsafe fn ptr_rotate_gcd<T>(
                 i += right;
             }
         }
+        start += 1;
     }
 }
 
