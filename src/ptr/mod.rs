@@ -588,6 +588,42 @@ unsafe fn swap_nonoverlapping_bytes(x: *mut u8, y: *mut u8, bytes: NonZero<usize
     }
 }
 
+#[logic(open, inline)]
+pub fn contains_range<T>(perm: Perm<*const [T]>, ptr: *const T, count: Int) -> bool {
+    pearlite! {
+        let offset = ptr.sub_logic(perm.ward().thin());
+        ptr == perm.ward().thin().offset_logic(offset) // same provenance
+        && 0 <= offset && offset + count <= perm.len()
+    }
+}
+
+/// Creusot variant of `core::intrinsics::copy` specialized to `Copy` types.
+/// In that case it's sound to assume that the source remains initialized.
+#[trusted]
+#[erasure(core::ptr::copy::<T>)]
+#[requires(contains_range(**perm, src, count@))]
+#[requires(contains_range(**perm, dst as *const T, count@))]
+#[ensures((^perm).ward() == (*perm).ward())]
+#[ensures({
+    let src_offset = src.sub_logic(perm.ward().thin());
+    let dst_offset = (dst as *const T).sub_logic(perm.ward().thin());
+    // Unchanged outside of `[dst..dst+count)`
+    (forall<i: Int> 0 <= i && i < dst_offset || dst_offset + count@ <= i && i < perm.len()
+        ==> (^perm).val()@[i] == (*perm).val()@[i])
+    // The new value in the range `[dst..dst+count)` is `[src..src+count)`
+    && (forall<i: Int> dst_offset <= i && i < dst_offset + count@
+        ==> (^perm).val()@[i] == (*perm).val()@[i + src_offset - dst_offset])
+})]
+pub unsafe fn copy_copy<T: Copy>(
+    src: *const T,
+    dst: *mut T,
+    count: usize,
+    perm: Ghost<&mut Perm<*const [T]>>,
+) {
+    let _ = perm;
+    unsafe { core::intrinsics::copy(src, dst, count) }
+}
+
 /// Copies `count * size_of::<T>()` bytes from `src` to `dst`. The source
 /// and destination may overlap.
 ///

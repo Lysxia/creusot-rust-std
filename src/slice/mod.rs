@@ -23,9 +23,9 @@ use crate::{
     assert_unsafe_precondition,
     ptr::{self as vptr, PtrAddExt as _},
 };
+use core::hint;
 use core::ops::{/* OneSidedRange, OneSidedRangeBound, */ Range, RangeInclusive};
 use core::simd::{self, Simd};
-use core::{hint /* range, */, ptr};
 
 /*
 #[unstable(
@@ -1157,7 +1157,51 @@ where
     }
 }
 
-#[trusted] // TODO
+// TODO: tidy up all these range functions
+#[logic(open, inline)]
+pub fn start<R: RangeBounds<usize>>(range: R) -> Int {
+    crate::slice::index::int_lower_bound(range.start_bound_logic())
+}
+
+#[logic(open, inline)]
+pub fn end<R: RangeBounds<usize>>(range: R, len: Int) -> Int {
+    crate::slice::index::int_upper_bound(range.end_bound_logic(), len)
+}
+
+#[logic(open, inline)]
+pub fn as_range<R: RangeBounds<usize>>(range: R, len: Int) -> Range<Int> {
+    start(range)..end(range, len)
+}
+
+// TODO: move to creusot_std
+#[logic(open)]
+pub fn ordered_range<R: RangeBounds<usize>>(range: R, len: Int) -> bool {
+    pearlite! {
+        start(range) <= end(range, len) && end(range, len) <= len
+    }
+}
+
+#[logic(open)]
+pub fn len_range<R: RangeBounds<usize>>(range: R, len: Int) -> Int {
+    end(range, len) - start(range)
+}
+
+// `i` lies in `range`, with upper bound `len`
+#[logic(open)]
+pub fn in_range<R: RangeBounds<usize>>(range: R, len: Int, i: Int) -> bool {
+    start(range) <= i && i < end(range, len)
+}
+
+// #[erasure(<[T]>::copy_within)] // TODO: RangeBounds trait erasure
+#[requires(|mode| mode.nopanic() ==> ordered_range(src, self_@.len()))]
+#[requires(|mode| mode.nopanic() ==> dest@ + len_range(src, self_@.len()) <= self_@.len())]
+#[ensures((^self_)@.len() == (*self_)@.len())]
+// Final contents at `dest` are the initial contents at `src`
+#[ensures(forall<i: Int> dest@ <= i && i < dest@ + len_range(src, self_@.len())
+    ==> (^self_)@[i] == (*self_)@[i + start(src) - dest@])]
+// Unmodified outside of `[dest, dest + len_range(...))`
+#[ensures(forall<i: Int> 0 <= i && i < dest@ || dest@ + len_range(src, self_@.len()) <= i && i < self_@.len()
+    ==> (^self_)@[i] == (*self_)@[i])]
 pub fn copy_within<T, R: RangeBounds<usize>>(self_: &mut [T], src: R, dest: usize)
 where
     T: Copy,
@@ -1172,10 +1216,10 @@ where
     // as have those for `ptr::add`.
     unsafe {
         // Derive both `src_ptr` and `dest_ptr` from the same loan
-        let ptr = self_.as_mut_ptr();
-        let src_ptr = ptr.add(src_start);
-        let dest_ptr = ptr.add(dest);
-        ptr::copy(src_ptr, dest_ptr, count);
+        let (ptr, perm) = self_.as_mut_ptr_perm();
+        let src_ptr = ptr.add_live_(src_start, ghost! { perm.live() });
+        let dest_ptr = ptr.add_live_(dest, ghost! { perm.live() });
+        crate::ptr::copy_copy(src_ptr, dest_ptr, count, perm);
     }
 }
 

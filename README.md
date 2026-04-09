@@ -41,8 +41,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | partition_dedup_by    | ✅ | 🔧 | 🚫 | |
 | rotate_left           | 🔧 | 🔧 | 🚫 | `copy`, `copy_nonoverlapping`, `read`, `write` |
 | rotate_right          | 🔧 | 🔧 | 🚫 | idem |
-| copy_from_slice       | 🔧 | ✅ | 🔧 | `copy_nonoverlapping` |
-| copy_within           | ❌ | ❌ | ❌ | TODO: overlapping slices |
+| copy_from_slice       | 🔧 | 🔧 | ✅ | `copy_nonoverlapping` |
+| copy_within           | ✅ | 🔧 | ✅ | TODO: overlapping slices |
 | swap_with_slice       | ✅ | 🔧 | ✅ | |
 | as_simd               | ❌ | ❌ | ❌ | TODO: spec for pointer cast |
 | as_simd_mut           | ❌ | ❌ | ❌ | TODO: spec for pointer cast |
@@ -53,4 +53,4 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 
 🔧: work in progress
 ❌: to do
-🚫: not planned
+🚫: not planned (cases where functional correctness seems much harder than just safety)
