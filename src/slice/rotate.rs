@@ -368,12 +368,12 @@ mod split {
     }
 }
 
-#[trusted]
+#[trusted] // Axiomatization of std's replace
 #[erasure(<*mut T>::replace)]
 #[requires(src as *const T == *perm.ward())]
 #[ensures(dst == *(^perm).val())]
 #[ensures(result == *perm.val())]
-unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
+unsafe fn replace<T>(src: *mut T, dst: T, _perm: Ghost<&mut Perm<*const T>>) -> T {
     unsafe { src.replace(dst) }
 }
 
@@ -512,6 +512,7 @@ fn ptr_rotate_swap_lemma_for_sub_live<T>(
     len: usize,
     live: &Ghost<creusot_std::std::ptr::PtrLive<T>>,
 ) {
+    let _ = (mid, len, live);
 }
 
 #[check(ghost)]
