@@ -618,7 +618,8 @@ unsafe fn swap_nonoverlapping_bytes(x: *mut u8, y: *mut u8, bytes: NonZero<usize
 #[requires(src == perm.source() && dst as *const T == perm.dest())]
 // WIP: how to make this sound for non-Copy types?
 /* pub const */
-pub unsafe fn copy_perm<T>(src: *const T, dst: *mut T, count: usize, _perm: Ghost<CopyPerm<T>>) {
+pub unsafe fn copy_perm<T>(src: *const T, dst: *mut T, count: usize, perm: Ghost<CopyPerm<T>>) {
+    let _ = perm;
     // SAFETY: the safety contract for `copy` must be upheld by the caller.
     unsafe {
         ub_checks::assert_unsafe_precondition!(
