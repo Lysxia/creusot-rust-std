@@ -1810,9 +1810,12 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 // #[unstable(feature = "slice_range", issue = "76393")]
 #[must_use]
 #[erasure(core::slice::range)]
-#[requires(int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end@) && int_upper_bound(range.end_bound_logic(), bounds.end@) <= bounds.end@)]
+#[requires(|mode| mode.nopanic()
+    ==> int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end@)
+    && int_upper_bound(range.end_bound_logic(), bounds.end@) <= bounds.end@)]
 #[ensures(result.start@ == int_lower_bound(range.start_bound_logic()))]
 #[ensures(result.end@ == int_upper_bound(range.end_bound_logic(), bounds.end@))]
+#[ensures(result.start@ <= result.end@ && result.end@ <= bounds.end@)]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
     R: RangeBounds<usize>,
@@ -1962,8 +1965,11 @@ pub(crate) fn try_into_slice_range(
 /// Converts pair of `ops::Bound`s into `ops::Range`.
 /// Panics on overflowing indices.
 #[erasure(private core::slice::index::into_slice_range)]
-#[requires(int_lower_bound(start) <= int_upper_bound(end, len@) && int_upper_bound(end, len@) <= len@)]
+#[requires(|mode| mode.nopanic()
+    ==> int_lower_bound(start) <= int_upper_bound(end, len@)
+    && int_upper_bound(end, len@) <= len@)]
 #[ensures(result.start@ == int_lower_bound(start) && result.end@ == int_upper_bound(end, len@))]
+#[ensures(result.start@ <= result.end@ && result.end@ <= len@)]
 pub(crate) fn into_slice_range(
     len: usize,
     (start, end): (ops::Bound<usize>, ops::Bound<usize>),
