@@ -68,6 +68,13 @@ fn flag(b: bool) -> bool {
     b
 }
 
+#[logic(open)]
+fn min_logic<T: OrdLogic>(x: T, y: T) -> T {
+    pearlite! {
+        if x <= y { x } else { y }
+    }
+}
+
 /// Algorithm 1 is used if `min(left, right)` is small enough to fit onto a stack buffer. The
 /// `min(left, right)` elements are copied onto the buffer, `memmove` is applied to the others, and
 /// the ones on the buffer are moved back into the hole on the opposite side of where they
@@ -79,6 +86,9 @@ fn flag(b: bool) -> bool {
 #[trusted]
 #[erasure(private core::slice::rotate::ptr_rotate_memmove)]
 #[inline]
+#[requires(size_of_logic::<T>() != 0)]
+#[requires(left != 0usize && right != 0usize)]
+#[requires(min_logic(left@, right@) <= size_of_logic::<BufType>() / size_of_logic::<T>())]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
 #[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
