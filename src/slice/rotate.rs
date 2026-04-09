@@ -373,7 +373,8 @@ mod split {
 #[requires(src as *const T == *perm.ward())]
 #[ensures(dst == *(^perm).val())]
 #[ensures(result == *perm.val())]
-unsafe fn replace<T>(src: *mut T, dst: T, _perm: Ghost<&mut Perm<*const T>>) -> T {
+unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
+    let _ = perm;
     unsafe { src.replace(dst) }
 }
 

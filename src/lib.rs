@@ -7,6 +7,7 @@
     new_range_api,
     sized_type_properties,
     portable_simd,
+    slice_partition_dedup,
     slice_ptr_get,
     ub_checks,
     fmt_internals,

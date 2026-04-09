@@ -962,6 +962,7 @@ where
     }
 }
 
+// #[erasure(<[T]>::partition_dedup_by::<F>)] // TODO: unsupported &mut []
 #[requires(|mode| forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition(mode, (x, y)))]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
@@ -1178,6 +1179,7 @@ where
     }
 }
 
+// #[erasure(<[T]>::swap_with_slice)] // TODO: reordered self.len()
 #[requires(|mode| mode.nopanic() ==> self_@.len() == other@.len())]
 #[ensures((^self_)@ == other@ && (^other)@ == self_@)]
 pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
