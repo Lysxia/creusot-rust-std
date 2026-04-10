@@ -51,8 +51,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | as_flattened          | 🔧 | ✅ | ✅ | `cast_from_chunks_perm` |
 | as_flattened_mut      | 🔧 | ✅ | ✅ | `cast_from_chunks_perm_mut` |
 
-🔧: work in progress
-❌: to do
+🔧: work in progress  
+❌: to do  
 🚫: not planned (cases where functional correctness seems much harder than just safety)
 
 [^reorder]: Some calls to `self.len()` were reordered due to additional lifetime constraints with permissions.
