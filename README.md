@@ -38,7 +38,7 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | split_at_checked      | ✅ | ✅ | ✅ | |
 | split_at_mut_checked  | ✅ | ✅ | ✅ | |
 | binary_search_by      | 🔧 | ✅ | 🚫 | TODO: Safety of function arguments |
-| partition_dedup_by    | 🔧 | 🔧 | 🚫 | idem |
+| partition_dedup_by    | 🔧 | ✅ | 🚫 | idem |
 | rotate_left           | ✅ | 🔧 | 🚫 | `copy`, `copy_nonoverlapping`, `read`, `write` |
 | rotate_right          | ✅ | 🔧 | 🚫 | idem |
 | copy_from_slice       | ✅ | 🔧[^reorder] | ✅ | `copy_nonoverlapping` |

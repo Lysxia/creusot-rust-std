@@ -962,7 +962,7 @@ where
     }
 }
 
-// #[erasure(<[T]>::partition_dedup_by::<F>)] // TODO: unsupported &mut []
+#[erasure(<[T]>::partition_dedup_by::<F>)] // TODO: unsupported &mut []
 #[requires(|mode| forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition(mode, (x, y)))]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
