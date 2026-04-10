@@ -48,8 +48,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | as_simd_mut           | ❌ | ❌ | ❌ | TODO: spec for pointer cast |
 | get_disjoint_mut      | ❌ | ❌ | ❌ | |
 | get_disjoint_check_valid | ❌ | ❌ | ❌ | |
-| as_flattened          | ✅ | ✅ | ✅ | `cast_from_chunks_perm` |
-| as_flattened_mut      | ✅ | ✅ | ✅ | `cast_from_chunks_perm_mut` |
+| as_flattened          | 🔧 | ✅ | ✅ | `cast_from_chunks_perm` |
+| as_flattened_mut      | 🔧 | ✅ | ✅ | `cast_from_chunks_perm_mut` |
 
 🔧: work in progress
 ❌: to do
