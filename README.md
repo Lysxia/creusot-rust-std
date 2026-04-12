@@ -8,8 +8,8 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 
 | Function | Safety | Erasure | Fun. correct | Notable trusted primitives and comments |
 |-|-|-|-|-|
-| get_unchecked           | ✅ | 🔧[^er-traits] | ✅ | Main challenge: general spec for indexing with both `usize` and ranges (subslicing) |
-| get_unchecked_mut       | ✅ | 🔧[^er-traits] | ✅ | idem |
+| get_unchecked           | ✅ | 🚧[^er-traits] | ✅ | Main challenge: general spec for indexing with both `usize` and ranges (subslicing) |
+| get_unchecked_mut       | ✅ | 🚧[^er-traits] | ✅ | idem |
 | swap_unchecked          | ✅ | ✅ | ✅ | `::core::ptr::swap` (`swap_disjoint`) |
 | as_chunks_unchecked     | ✅ | ✅ | ✅ | `cast_chunks_perm` (ad hoc axiomatization of pointer cast) |
 | as_chunks_unchecked_mut | ✅ | ✅ | ✅ | `cast_chunks_perm_mut` |
@@ -31,27 +31,27 @@ Goal: verify slice functions ([Verify Rust Std Challenge 17](https://model-check
 | split_last_chunk_mut  | ✅ | ✅ | ✅ | idem |
 | last_chunk            | ✅ | ✅ | ✅ | idem |
 | last_chunk_mut        | ✅ | ✅ | ✅ | idem |
-| reverse               | ✅ | 🔧[^reorder] | ✅ | |
+| reverse               | ✅ | 🚧[^reorder] | ✅ | |
 | as_chunks             | ✅ | ✅ | ✅ | |
 | as_chunks_mut         | ✅ | ✅ | ✅ | |
 | as_rchunks            | ✅ | ✅ | ✅ | |
 | split_at_checked      | ✅ | ✅ | ✅ | |
 | split_at_mut_checked  | ✅ | ✅ | ✅ | |
-| binary_search_by      | 🔧 | ✅ | 🚫 | TODO: Safety of function arguments |
-| partition_dedup_by    | 🔧 | ✅ | 🚫 | idem |
-| rotate_left           | ✅ | 🔧 | 🚫 | `copy`, `copy_nonoverlapping`, `read`, `write` |
-| rotate_right          | ✅ | 🔧 | 🚫 | idem |
-| copy_from_slice       | ✅ | 🔧[^reorder] | ✅ | `copy_nonoverlapping` |
-| copy_within           | ✅ | 🔧[^er-traits] | ✅ | |
-| swap_with_slice       | ✅ | 🔧[^reorder] | ✅ | |
+| binary_search_by      | 🚧 | ✅ | 🚫 | TODO: Safety of function arguments |
+| partition_dedup_by    | 🚧 | ✅ | 🚫 | idem |
+| rotate_left           | ✅ | 🚧 | 🚫 | `copy`, `copy_nonoverlapping`, `read`, `write` |
+| rotate_right          | ✅ | 🚧 | 🚫 | idem |
+| copy_from_slice       | ✅ | 🚧[^reorder] | ✅ | `copy_nonoverlapping` |
+| copy_within           | ✅ | 🚧[^er-traits] | ✅ | |
+| swap_with_slice       | ✅ | 🚧[^reorder] | ✅ | |
 | as_simd               | ❌ | ❌ | ❌ | TODO: spec for pointer cast |
 | as_simd_mut           | ❌ | ❌ | ❌ | TODO: spec for pointer cast |
 | get_disjoint_mut      | ❌ | ❌ | ❌ | |
 | get_disjoint_check_valid | ❌ | ❌ | ❌ | |
-| as_flattened          | 🔧 | ✅ | ✅ | `cast_from_chunks_perm` |
-| as_flattened_mut      | 🔧 | ✅ | ✅ | `cast_from_chunks_perm_mut` |
+| as_flattened          | 🚧 | ✅ | ✅ | `cast_from_chunks_perm` |
+| as_flattened_mut      | 🚧 | ✅ | ✅ | `cast_from_chunks_perm_mut` |
 
-🔧: work in progress  
+🚧: work in progress  
 ❌: to do  
 🚫: not planned (cases where functional correctness seems much harder than just safety)
 
