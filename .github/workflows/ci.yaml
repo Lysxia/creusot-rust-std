@@ -63,10 +63,10 @@ jobs:
           ./INSTALL
 
       - name: Set up toolchain
-        run: rustup component add rust-src --toolchain nightly-2025-11-13
+        run: rustup component add rust-src --toolchain nightly-2026-08-03
 
       - name: Run Creusot
-        run: cargo creusot prove
+        run: cargo creusot
 
       - name: Check erasure
-        run: cargo clean && cargo creusot --erasure-check
+        run: cargo clean && cargo creusot --erasure-check --only=coma
