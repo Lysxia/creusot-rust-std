@@ -12,7 +12,7 @@ use crate::ops;
 #[cfg(creusot)]
 use core::ops::Bound;
 use core::range;
-use creusot_std::{ghost::perm::Perm, prelude::*, std::ops::RangeBounds, std::ptr::PtrLive};
+use creusot_std::{ghost::perm::Perm, prelude::*, std::ops::RangeBoundsSpec, std::ptr::PtrLive};
 
 // #[stable(feature = "rust1", since = "1.0.0")]
 impl<T, I> ops::Index<I> for [T]
@@ -49,7 +49,7 @@ where
 #[track_caller]
 #[check(ghost)]
 #[erasure(private core::slice::index::slice_index_fail)]
-#[requires(|mode| !mode.nopanic())]
+#[requires(!mode!().nopanic())]
 const fn slice_index_fail(start: usize, end: usize, len: usize) -> ! {
     if start > len {
         const_panic!(
@@ -650,7 +650,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[inline(always)]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index)]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         // Using checked_sub is a safe way to get `SubUnchecked` in MIR
@@ -672,7 +672,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
 
     #[inline]
     #[erasure(<ops::Range<usize> as core::slice::SliceIndex<[T]>>::index_mut)]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -963,7 +963,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         if self.start > slice.len() {
@@ -985,7 +985,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeFrom<usize> {
 
     #[inline]
     #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)]
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -1498,7 +1498,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
 
     #[inline]
     // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index)] // TODO
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     fn index(self, slice: &[T]) -> &[T] {
         let Self {
@@ -1525,7 +1525,7 @@ unsafe impl<T> SliceIndex<[T]> for RangeInclusive<usize> {
 
     #[inline]
     // #[erasure(<Self as core::slice::SliceIndex<[T]>>::index_mut)] // TODO
-    #[requires(|mode| mode.nopanic() ==> self.in_bounds(*slice))]
+    #[requires(mode!().nopanic() ==> self.in_bounds(*slice))]
     #[ensures(self.slice_index(*slice, *result))]
     #[ensures(self.slice_index(^slice, ^result))]
     #[ensures(self.resolve_elsewhere(*slice, ^slice))]
@@ -1810,7 +1810,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 // #[unstable(feature = "slice_range", issue = "76393")]
 #[must_use]
 #[erasure(core::slice::range)]
-#[requires(|mode| mode.nopanic()
+#[requires(mode!().nopanic()
     ==> int_lower_bound(range.start_bound_logic()) <= int_upper_bound(range.end_bound_logic(), bounds.end@)
     && int_upper_bound(range.end_bound_logic(), bounds.end@) <= bounds.end@)]
 #[ensures(result.start@ == int_lower_bound(range.start_bound_logic()))]
@@ -1818,7 +1818,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::RangeToInclusive<usize> {
 #[ensures(result.start@ <= result.end@ && result.end@ <= bounds.end@)]
 pub fn range<R>(range: R, bounds: ops::RangeTo<usize>) -> ops::Range<usize>
 where
-    R: RangeBounds<usize>,
+    R: RangeBoundsSpec<usize>,
 {
     let len = bounds.end;
     into_slice_range(
@@ -1887,7 +1887,7 @@ pub fn int_upper_bound<T: DeepModel<DeepModelTy = Int>>(hi: Bound<T>, len: Int) 
 #[requires(false)]
 pub fn try_range<R>(range: R, bounds: ops::RangeTo<usize>) -> Option<ops::Range<usize>>
 where
-    R: RangeBounds<usize>,
+    R: RangeBoundsSpec<usize>,
 {
     let len = bounds.end;
     try_into_slice_range(
@@ -1965,7 +1965,7 @@ pub(crate) fn try_into_slice_range(
 /// Converts pair of `ops::Bound`s into `ops::Range`.
 /// Panics on overflowing indices.
 #[erasure(private core::slice::index::into_slice_range)]
-#[requires(|mode| mode.nopanic()
+#[requires(mode!().nopanic()
     ==> int_lower_bound(start) <= int_upper_bound(end, len@)
     && int_upper_bound(end, len@) <= len@)]
 #[ensures(result.start@ == int_lower_bound(start) && result.end@ == int_upper_bound(end, len@))]

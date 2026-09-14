@@ -8,16 +8,6 @@ use creusot_std::{ghost::perm::Perm, prelude::*};
 
 type BufType = [usize; 32];
 
-extern_spec! {
-    mod core {
-        mod intrinsics {
-            #[check(terminates)]
-            #[ensures(result@ == size_of_logic::<T>())]
-            fn size_of<T>() -> usize;
-        }
-    }
-}
-
 /// Rotates the range `[mid-left, mid+right)` such that the element at `mid` becomes the first
 /// element. Equivalently, rotates the range `left` elements to the left or `right` elements to the
 /// right.
@@ -84,6 +74,7 @@ fn min_logic<T: OrdLogic>(x: T, y: T) -> T {
 ///
 /// The specified range must be valid for reading and writing.
 #[trusted]
+#[allow(unused_variables)] // perm
 #[erasure(private core::slice::rotate::ptr_rotate_memmove)]
 #[inline]
 #[requires(size_of_logic::<T>() != 0)]

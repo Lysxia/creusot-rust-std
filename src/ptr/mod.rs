@@ -747,7 +747,7 @@ pub unsafe fn copy_nonoverlapping<T>(
 
 #[allow(unused_variables)]
 #[trusted] // Specify transmute
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[requires(0 < N@)]
 #[requires(perm.len() % N@ == 0)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
@@ -760,7 +760,7 @@ pub fn cast_chunks_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*co
 
 #[allow(unused_variables)]
 #[trusted] // Specify transmute
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[requires(0 < N@)]
 #[requires(perm.len() % N@ == 0)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
@@ -778,7 +778,7 @@ pub fn cast_chunks_perm_mut<const N: usize, T>(
 
 #[allow(unused_variables)]
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
 #[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
 pub fn cast_from_chunks_perm<const N: usize, T>(perm: &Perm<*const [[T; N]]>) -> &Perm<*const [T]> {
@@ -787,7 +787,7 @@ pub fn cast_from_chunks_perm<const N: usize, T>(perm: &Perm<*const [[T; N]]>) ->
 
 #[allow(unused_variables)]
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
 #[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
 #[ensures(perm.ward() == (^perm).ward())]
@@ -800,7 +800,7 @@ pub fn cast_from_chunks_perm_mut<const N: usize, T>(
 
 #[allow(unused_variables)]
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[requires(perm.len() == N@)]
 #[ensures(*result.ward() == *perm.ward() as *const [T; N])]
 #[ensures(result.val()@ == perm.val()@)]
@@ -810,7 +810,7 @@ pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*con
 
 #[allow(unused_variables)]
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[requires(perm.len() == N@)]
 #[ensures(*result.ward() == *perm.ward() as *const [T; N])]
 #[ensures(result.val()@ == perm.val()@)]

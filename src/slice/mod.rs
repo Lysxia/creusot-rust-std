@@ -15,7 +15,7 @@ use core::mem::{self, MaybeUninit, SizedTypeProperties};
 use creusot_std::{
     ghost::perm::Perm,
     prelude::{Clone, PartialEq, *},
-    std::ops::RangeBounds,
+    std::ops::RangeBoundsSpec,
 };
 // use core::num::NonZero;
 use crate::panic::const_panic;
@@ -669,10 +669,11 @@ pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*
 #[ensures((^self_)@ == self_@.reverse())]
 /* pub const */
 pub fn reverse<T>(self_: &mut [T]) {
-    let _self: Snapshot<&mut [T]> = snapshot! { self_ };
     let len = self_.len();
     let half_len = len / 2;
+    let _self: Snapshot<&[T]> = snapshot!(&*self_);
     let (Range { start, end }, perm) = as_mut_ptr_range(self_);
+    let _perm = snapshot!(perm);
     let (perm1, perm2) = ghost! {
         perm.into_inner().split_at_mut(*Int::new(half_len as i128))
     }
@@ -697,6 +698,7 @@ pub fn reverse<T>(self_: &mut [T]) {
         };
     let _front = snapshot!(front_half);
     let _back = snapshot!(back_half);
+    proof_assert!((^_front)@ == (^_perm).val()@[..half_len@]);
     // Introducing a function boundary here means that the two halves
     // get `noalias` markers, allowing better optimization as LLVM
     // knows that they're disjoint, unlike in the original slice.
@@ -745,11 +747,10 @@ pub fn reverse<T>(self_: &mut [T]) {
 #[check(ghost)]
 #[requires(self_@.len() - front@.len() - back@.len() <= 1)]
 #[requires(self_@ == front@.concat(self_@[front@.len()..self_@.len() - back@.len()]).concat(back@))]
-#[requires((^self_)@ == (^front)@.concat(self_@[front@.len()..self_@.len() - back@.len()]).concat((^back)@))]
 #[requires((^front)@ == back@.reverse() && (^back)@ == front@.reverse())]
-#[ensures((^self_)@ == self_@.reverse())]
+#[ensures(self_@.reverse() == (^front)@.concat(self_@[front@.len()..self_@.len() - back@.len()]).concat((^back)@))]
 fn reverse_lemma<T>(
-    self_: Snapshot<&mut [T]>,
+    self_: Snapshot<&[T]>,
     front: Snapshot<&mut [T]>,
     back: Snapshot<&mut [T]>,
 ) {
@@ -782,7 +783,7 @@ fn cons_suffix_of<T>(b: Snapshot<Seq<T>>, i: Int) {
 fn snoc_prefix<T>() {}
 
 #[erasure(<[T]>::as_chunks::<N>)]
-#[requires(|mode| mode.nopanic() ==> N@ != 0)]
+#[requires(mode!().nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() / N@)]
 #[ensures(result.1@.len() == self_@.len() % N@)]
 #[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
@@ -807,7 +808,7 @@ pub fn as_chunks<T, const N: usize>(self_: &[T]) -> (&[[T; N]], &[T]) {
 }
 
 #[erasure(<[T]>::as_rchunks::<N>)]
-#[requires(|mode| mode.nopanic() ==> N@ != 0)]
+#[requires(mode!().nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() % N@)]
 #[ensures(result.1@.len() == self_@.len() / N@)]
 #[ensures(forall<i> 0 <= i && i < self_@.len() % N@
@@ -833,7 +834,7 @@ pub fn as_rchunks<T, const N: usize>(self_: &[T]) -> (&[T], &[[T; N]]) {
 }
 
 #[erasure(<[T]>::as_chunks_mut::<N>)]
-#[requires(|mode| mode.nopanic() ==> N@ != 0)]
+#[requires(mode!().nopanic() ==> N@ != 0)]
 #[ensures(result.0@.len() == self_@.len() / N@)]
 #[ensures(result.1@.len() == self_@.len() % N@)]
 #[ensures(forall<i, j> 0 <= i && i < self_@.len() / N@ && 0 <= j && j < N@
@@ -903,7 +904,7 @@ pub fn split_at_mut_checked<T>(self_: &mut [T], mid: usize) -> Option<(&mut [T],
 
 // Try to just prove safety for now
 #[erasure(<[T]>::binary_search_by::<'a, F>)]
-#[requires(|mode| forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition(mode, (&x,)))]
+#[requires(forall<f2, x: T> f.hist_inv(f2) && self_@.contains(x) ==> f2.precondition((&x,), mode!()))]
 pub fn binary_search_by<'a, T, F>(self_: &'a [T], mut f: F) -> Result<usize, usize>
 where
     F: FnMut(&'a T) -> Ordering,
@@ -963,7 +964,7 @@ where
 }
 
 #[erasure(<[T]>::partition_dedup_by::<F>)] // TODO: unsupported &mut []
-#[requires(|mode| forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition(mode, (x, y)))]
+#[requires(forall<f2, x: &mut T, y: &mut T> same_bucket.hist_inv(f2) ==> f2.precondition((x, y), mode!()))]
 pub fn partition_dedup_by<T, F>(self_: &mut [T], mut same_bucket: F) -> (&mut [T], &mut [T])
 where
     F: FnMut(&mut T, &mut T) -> bool,
@@ -1089,7 +1090,7 @@ where
 }
 
 // #[erasure(<[T]>::rotate_left)] // TODO: erase flag() in ptr_rotate
-#[requires(|mode| mode.nopanic() ==> mid@ <= self_@.len())]
+#[requires(mode!().nopanic() ==> mid@ <= self_@.len())]
 // #[ensures((^self_)@ == (*self_)@[mid@..].concat((*self_)@[..mid@]))]
 pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     assert!(mid <= self_.len());
@@ -1104,7 +1105,7 @@ pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
 }
 
 // #[erasure(<[T]>::rotate_right)] // TODO: erase flag() in ptr_rotate
-#[requires(|mode| mode.nopanic() ==> k@ <= self_@.len())]
+#[requires(mode!().nopanic() ==> k@ <= self_@.len())]
 // #[ensures((^self_)@ == (*self_)@[self_@.len() - k@..].concat((*self_)@[..self_@.len() - k@]))]
 pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     assert!(k <= self_.len());
@@ -1119,7 +1120,7 @@ pub fn rotate_right<T>(self_: &mut [T], k: usize) {
 }
 
 // #[erasure(<[T]>::copy_from_slice)] // TODO: reordered self.len()
-#[requires(|mode| mode.nopanic() ==> self_@.len() == src@.len())]
+#[requires(mode!().nopanic() ==> self_@.len() == src@.len())]
 #[ensures((^self_)@ == src@)]
 /* pub const */
 pub fn copy_from_slice<T>(self_: &mut [T], src: &[T])
@@ -1132,7 +1133,7 @@ where
     // #[cfg_attr(feature = "panic_immediate_abort", inline)]
     #[track_caller]
     #[allow(unused_variables)]
-    #[requires(|mode| mode.nopanic() ==> false)]
+    #[requires(mode!().nopanic() ==> false)]
     const fn len_mismatch_fail(dst_len: usize, src_len: usize) -> ! {
         const_panic!(
             "copy_from_slice: source slice length does not match destination slice length",
@@ -1159,42 +1160,42 @@ where
 
 // TODO: tidy up all these range functions
 #[logic(open, inline)]
-pub fn start<R: RangeBounds<usize>>(range: R) -> Int {
+pub fn start<R: RangeBoundsSpec<usize>>(range: R) -> Int {
     crate::slice::index::int_lower_bound(range.start_bound_logic())
 }
 
 #[logic(open, inline)]
-pub fn end<R: RangeBounds<usize>>(range: R, len: Int) -> Int {
+pub fn end<R: RangeBoundsSpec<usize>>(range: R, len: Int) -> Int {
     crate::slice::index::int_upper_bound(range.end_bound_logic(), len)
 }
 
 #[logic(open, inline)]
-pub fn as_range<R: RangeBounds<usize>>(range: R, len: Int) -> Range<Int> {
+pub fn as_range<R: RangeBoundsSpec<usize>>(range: R, len: Int) -> Range<Int> {
     start(range)..end(range, len)
 }
 
 // TODO: move to creusot_std
 #[logic(open)]
-pub fn ordered_range<R: RangeBounds<usize>>(range: R, len: Int) -> bool {
+pub fn ordered_range<R: RangeBoundsSpec<usize>>(range: R, len: Int) -> bool {
     pearlite! {
         start(range) <= end(range, len) && end(range, len) <= len
     }
 }
 
 #[logic(open)]
-pub fn len_range<R: RangeBounds<usize>>(range: R, len: Int) -> Int {
+pub fn len_range<R: RangeBoundsSpec<usize>>(range: R, len: Int) -> Int {
     end(range, len) - start(range)
 }
 
 // `i` lies in `range`, with upper bound `len`
 #[logic(open)]
-pub fn in_range<R: RangeBounds<usize>>(range: R, len: Int, i: Int) -> bool {
+pub fn in_range<R: RangeBoundsSpec<usize>>(range: R, len: Int, i: Int) -> bool {
     start(range) <= i && i < end(range, len)
 }
 
 // #[erasure(<[T]>::copy_within)] // TODO: RangeBounds trait erasure
-#[requires(|mode| mode.nopanic() ==> ordered_range(src, self_@.len()))]
-#[requires(|mode| mode.nopanic() ==> dest@ + len_range(src, self_@.len()) <= self_@.len())]
+#[requires(mode!().nopanic() ==> ordered_range(src, self_@.len()))]
+#[requires(mode!().nopanic() ==> dest@ + len_range(src, self_@.len()) <= self_@.len())]
 #[ensures((^self_)@.len() == (*self_)@.len())]
 // Final contents at `dest` are the initial contents at `src`
 #[ensures(forall<i: Int> dest@ <= i && i < dest@ + len_range(src, self_@.len())
@@ -1202,7 +1203,7 @@ pub fn in_range<R: RangeBounds<usize>>(range: R, len: Int, i: Int) -> bool {
 // Unmodified outside of `[dest, dest + len_range(...))`
 #[ensures(forall<i: Int> 0 <= i && i < dest@ || dest@ + len_range(src, self_@.len()) <= i && i < self_@.len()
     ==> (^self_)@[i] == (*self_)@[i])]
-pub fn copy_within<T, R: RangeBounds<usize>>(self_: &mut [T], src: R, dest: usize)
+pub fn copy_within<T, R: RangeBoundsSpec<usize>>(self_: &mut [T], src: R, dest: usize)
 where
     T: Copy,
 {
@@ -1224,7 +1225,7 @@ where
 }
 
 // #[erasure(<[T]>::swap_with_slice)] // TODO: reordered self.len()
-#[requires(|mode| mode.nopanic() ==> self_@.len() == other@.len())]
+#[requires(mode!().nopanic() ==> self_@.len() == other@.len())]
 #[ensures((^self_)@ == other@ && (^other)@ == self_@)]
 pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     assert!(
@@ -1297,7 +1298,7 @@ pub trait ArraySliceExt<T, const N: usize> {
 }
 
 #[erasure(<[[T; N]]>::as_flattened)]
-#[requires(self_@.len() * N@ <= usize::MAX@)] // TODO: How to guarantee this when T is not a ZST?
+#[requires(self_@.len() * N@ <= usize::MAX@)] // TODO: This shouldn't be needed (and it breaks the safety check). How to guarantee this when T is not a ZST?
 #[ensures(result@ == self_@.flat_map(|chunk: [T; N]| chunk@))]
 pub fn as_flattened<T, const N: usize>(self_: &[[T; N]]) -> &[T] {
     let len = if T::IS_ZST {
