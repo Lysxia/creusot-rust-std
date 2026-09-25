@@ -16,6 +16,7 @@ use creusot_std::{
     ghost::perm::Perm,
     prelude::{Clone, PartialEq, *},
     std::ops::RangeBoundsSpec,
+    invariant::Guarded,
 };
 // use core::num::NonZero;
 use crate::panic::const_panic;
@@ -68,30 +69,30 @@ use raw::{from_raw_parts, from_raw_parts_mut, from_raw_parts_mut_perm, from_raw_
 
 #[check(ghost)]
 #[requires(0 <= i && i < s.len() && 0 <= j && j < s.len() && i != j)]
-#[ensures(*result.0.ward() == (*s.ward() as *const T).offset_logic(i))]
-#[ensures(*result.1.ward() == (*s.ward() as *const T).offset_logic(j))]
-#[ensures(*result.0.val() == s.val()@[i])]
-#[ensures(*result.1.val() == s.val()@[j])]
-#[ensures(*(^(*result).0).val() == (^*s).val()@[i])]
-#[ensures(*(^(*result).1).val() == (^*s).val()@[j])]
+#[ensures(*result.0.guard() == |p: &mut Perm<*const T>| *p.ward() == (*s.ward() as *const T).offset_logic(i))]
+#[ensures(*result.1.guard() == |p: &mut Perm<*const T>| *p.ward() == (*s.ward() as *const T).offset_logic(j))]
+#[ensures(*result.0.inner.val() == s.val()@[i])]
+#[ensures(*result.1.inner.val() == s.val()@[j])]
+#[ensures(*(^(*result).0.inner).val() == (^*s).val()@[i])]
+#[ensures(*(^(*result).1.inner).val() == (^*s).val()@[j])]
 #[ensures((^*s).ward() == s.ward())]
 #[ensures(forall<k: Int> k != i && k != j ==> (^*s).val()@.get(k) == s.val()@.get(k))]
 pub fn block_get_2<T>(
     s: Ghost<&mut Perm<*const [T]>>,
     i: Int,
     j: Int,
-) -> Ghost<(&mut Perm<*const T>, &mut Perm<*const T>)> {
+) -> Ghost<(Guarded<&mut Perm<*const T>>, Guarded<&mut Perm<*const T>>)> {
     ghost! {
         let _s = snapshot!(s);
         if i < j {
             let (s, sj) = s.into_inner().split_at_mut(j);
             proof_assert!{ forall<k> k < j ==> (^*_s).val()@.get(k) == (^s).val()@.get(k)};
             proof_assert!{ forall<k> k != i && k != j ==> k < i || k > i };
-            (s.index_mut(i), sj.index_mut(0int))
+            (s.inner.index_mut(i), sj.inner.index_mut(0int))
         } else {
             let (s, si) = s.into_inner().split_at_mut(i);
             proof_assert!{ forall<k> i < k ==> (^*_s).val()@.get(k) == (^si).val()@.get(k-i)};
-            (si.index_mut(0int), s.index_mut(j))
+            (si.inner.index_mut(0int), s.inner.index_mut(j))
         }
     }
 }
@@ -128,6 +129,7 @@ where
     I: SliceIndex<[T]>,
 {
     let (ptr, perm) = Perm::from_mut(self_);
+    let perm = ghost! { perm.into_inner().inner };
     // SAFETY: the caller must uphold the safety requirements for `get_unchecked_mut`;
     // the slice is dereferenceable because `self` is a safe reference.
     // The returned pointer is safe because impls of `SliceIndex` have to guarantee that it is.
@@ -155,6 +157,7 @@ pub unsafe fn swap_unchecked<T>(self_: &mut [T], a: usize, b: usize) {
     );
 
     let (ptr, mut perm) = self_.as_mut_ptr_perm();
+    let mut perm = ghost!{ perm.into_inner().inner };
     let live = ghost! { perm.live_mut() };
     let perm = ghost! {
         if a == b {
@@ -219,7 +222,7 @@ pub unsafe fn as_chunks_unchecked_mut<T, const N: usize>(self_: &mut [T]) -> &mu
     // SAFETY: Caller must guarantee that `N` is nonzero and exactly divides the slice length
     let new_len = unsafe { exact_div(self_.len(), N) };
     let (ptr, perm) = self_.as_mut_ptr_perm();
-    let perm = ghost! { crate::ptr::cast_chunks_perm_mut(perm.into_inner()) };
+    let perm = ghost! { crate::ptr::cast_chunks_perm_mut(perm.into_inner().inner) };
     // SAFETY: We cast a slice of `new_len * N` elements into
     // a slice of `new_len` many `N` elements chunks.
     unsafe { from_raw_parts_mut_perm((ptr as *mut T).cast(), new_len, perm) }
@@ -296,11 +299,14 @@ pub unsafe fn split_at_unchecked<T>(self_: &[T], mid: usize) -> (&[T], &[T]) {
 unsafe fn split_at_mut_unchecked<T>(self_: &mut [T], mid: usize) -> (&mut [T], &mut [T]) {
     let len = self_.len();
     let (ptr, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost! { perm.into_inner().inner };
     let live = ghost! { perm.live_mut() };
     let (perm0, perm1) = ghost! {
         perm.into_inner().split_at_mut(*Int::new(mid as i128))
     }
     .split();
+    let perm0 = ghost! { perm0.into_inner().inner };
+    let perm1 = ghost! { perm1.into_inner().inner };
 
     assert_unsafe_precondition!(
         check_library_ub,
@@ -520,7 +526,7 @@ pub fn first_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]
     } else {
         let (ptr, perm) = self_.as_mut_ptr_perm();
         let perm = ghost! {
-            cast_array_perm_mut(perm.into_inner().split_at_mut(*Int::new(N as i128)).0)
+            cast_array_perm_mut(perm.into_inner().inner.split_at_mut(*Int::new(N as i128)).0.inner)
         };
         // SAFETY: We explicitly check for the correct number of elements,
         //   do not let the reference outlive the slice,
@@ -562,7 +568,7 @@ pub fn split_first_chunk_mut<T, const N: usize>(
     };
 
     let (ptr, perm) = first.as_mut_ptr_perm();
-    let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
+    let perm = ghost! { cast_array_perm_mut(perm.into_inner().inner) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
@@ -602,7 +608,7 @@ pub fn split_last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<(&mut 
     let (init, last) = self_.split_at_mut(index);
 
     let (ptr, perm) = last.as_mut_ptr_perm();
-    let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
+    let perm = ghost! { cast_array_perm_mut(perm.into_inner().inner) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
     //   and enforce exclusive mutability of the chunk by the split.
@@ -644,6 +650,7 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
     let (_, last) = split_at_mut(self_, index);
 
     let (ptr, perm) = last.as_mut_ptr_perm();
+    let perm = ghost!{ perm.into_inner().inner };
     let perm = ghost! { cast_array_perm_mut(perm.into_inner()) };
     // SAFETY: We explicitly check for the correct number of elements,
     //   do not let the reference outlive the slice,
@@ -660,6 +667,7 @@ pub fn last_chunk_mut<T, const N: usize>(self_: &mut [T]) -> Option<&mut [T; N]>
 pub fn as_mut_ptr_range<T>(self_: &mut [T]) -> (Range<*mut T>, Ghost<&mut Perm<*const [T]>>) {
     let len = self_.len(); // Get the length before borrowing `self_`
     let (start, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost!{ perm.into_inner().inner };
     // SAFETY: See as_ptr_range() above for why `add` here is safe.
     let end = unsafe { start.add_live_(len, ghost! { perm.live() }) };
     (start..end, perm)
@@ -680,9 +688,12 @@ pub fn reverse<T>(self_: &mut [T]) {
     .split();
     let perm2 = ghost! {
         let i = *Int::new((len - 2 * half_len) as i128);
-        perm2.into_inner().split_at_mut(i).1
+        perm2.into_inner().inner.split_at_mut(i).1
     };
     proof_assert! { perm2.ward().thin().offset_logic(half_len@) == end as *const T };
+
+    let perm1 = ghost!{ perm1.into_inner().inner };
+    let perm2 = ghost!{ perm2.into_inner().inner };
 
     // These slices will skip the middle item for an odd length,
     // since that one doesn't need to move.
@@ -1061,22 +1072,22 @@ where
         #[invariant(1 <= next_write@ && next_write@ <= next_read@ && next_read@ <= len@)]
         #[invariant(_same_bucket.hist_inv(same_bucket))]
         while next_read < len {
-            let live = ghost! { perm.live_mut() };
-            let (perm0, perm1) = ghost! { perm.split_at_mut(*Int::new(next_read as i128)) }.split();
+            let live = ghost! { perm.inner.live_mut() };
+            let (perm0, perm1) = ghost! { perm.inner.split_at_mut(*Int::new(next_read as i128)) }.split();
             let ptr_read = ptr.add_live_(next_read, live);
             let prev_ptr_write = ptr.add_live_(next_write - 1, live);
-            let mut read_perm = ghost! { perm1.into_inner().index_mut(0int) };
-            let (prev_write_perm, write_perm) = ghost! { perm0.into_inner().split_at_mut(*Int::new(next_write as i128 - 1)).1.split_at_mut(1int) }.split();
-            let prev_write_perm = ghost! { prev_write_perm.into_inner().index_mut(0int) };
+            let mut read_perm = ghost! { perm1.into_inner().inner.index_mut(0int) };
+            let (prev_write_perm, write_perm) = ghost! { perm0.into_inner().inner.split_at_mut(*Int::new(next_write as i128 - 1)).1.inner.split_at_mut(1int) }.split();
+            let prev_write_perm = ghost! { prev_write_perm.into_inner().inner.index_mut(0int).inner };
             if !same_bucket(
-                Perm::as_mut(ptr_read, ghost! { *read_perm }),
+                Perm::as_mut(ptr_read, ghost! { read_perm.inner }),
                 Perm::as_mut(prev_ptr_write, prev_write_perm),
             ) {
                 if next_read != next_write {
                     let ptr_write = prev_ptr_write.add_live_(1, live);
-                    let write_perm = ghost! { write_perm.into_inner().index_mut(0int) };
+                    let write_perm = ghost! { write_perm.into_inner().inner.index_mut(0int).inner };
                     mem::swap(
-                        Perm::as_mut(ptr_read, read_perm),
+                        Perm::as_mut(ptr_read, ghost! { read_perm.inner }),
                         Perm::as_mut(ptr_write, write_perm),
                     );
                 }
@@ -1096,6 +1107,7 @@ pub fn rotate_left<T>(self_: &mut [T], mid: usize) {
     assert!(mid <= self_.len());
     let k = self_.len() - mid;
     let (p, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost! { perm.into_inner().inner };
 
     // SAFETY: The range `[p.add(mid) - mid, p.add(mid) + k)` is trivially
     // valid for reading and writing, as required by `ptr_rotate`.
@@ -1111,6 +1123,7 @@ pub fn rotate_right<T>(self_: &mut [T], k: usize) {
     assert!(k <= self_.len());
     let mid = self_.len() - k;
     let (p, perm) = self_.as_mut_ptr_perm();
+    let perm = ghost! { perm.into_inner().inner };
 
     // SAFETY: The range `[p.add(mid) - mid, p.add(mid) + k)` is trivially
     // valid for reading and writing, as required by `ptr_rotate`.
@@ -1150,6 +1163,7 @@ where
     let len = self_.len();
     let (src_ptr, src_perm) = src.as_ptr_perm();
     let (dst_ptr, dst_perm) = self_.as_mut_ptr_perm();
+    let dst_perm = ghost!{ dst_perm.into_inner().inner };
     // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
     // checked to have the same length. The slices cannot overlap because
     // mutable references are exclusive.
@@ -1218,6 +1232,7 @@ where
     unsafe {
         // Derive both `src_ptr` and `dest_ptr` from the same loan
         let (ptr, perm) = self_.as_mut_ptr_perm();
+        let perm = ghost!{ perm.into_inner().inner };
         let src_ptr = ptr.add_live_(src_start, ghost! { perm.live() });
         let dest_ptr = ptr.add_live_(dest, ghost! { perm.live() });
         crate::ptr::copy_copy(src_ptr, dest_ptr, count, perm);
@@ -1235,6 +1250,8 @@ pub fn swap_with_slice<T>(self_: &mut [T], other: &mut [T]) {
     let len = self_.len();
     let (ptr1, perm1) = self_.as_mut_ptr_perm();
     let (ptr2, perm2) = other.as_mut_ptr_perm();
+    let perm1 = ghost!{ perm1.into_inner().inner };
+    let perm2 = ghost!{ perm2.into_inner().inner };
     // SAFETY: `self` is valid for `self.len()` elements by definition, and `src` was
     // checked to have the same length. The slices cannot overlap because
     // mutable references are exclusive.
@@ -1329,7 +1346,7 @@ pub fn as_flattened_mut<T, const N: usize>(self_: &mut [[T; N]]) -> &mut [T] {
         unsafe { self_.len().unchecked_mul(N) }
     };
     let (ptr, perm) = self_.as_mut_ptr_perm();
-    let perm = ghost! { cast_from_chunks_perm_mut(perm.into_inner()) };
+    let perm = ghost! { cast_from_chunks_perm_mut(perm.into_inner().inner) };
     snapshot! { len_flat_map_const::<T, N> };
     // SAFETY: `[T]` is layout-identical to `[T; N]`
     unsafe { from_raw_parts_mut_perm(ptr.cast(), len, perm) }

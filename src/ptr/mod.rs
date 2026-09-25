@@ -4,7 +4,7 @@ use crate::{
 };
 use ::core::mem::SizedTypeProperties as _;
 use core::hint::assert_unchecked as assume;
-use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
+use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive, invariant::Guarded};
 use std::{
     mem::{self, MaybeUninit},
     num::NonZero,
