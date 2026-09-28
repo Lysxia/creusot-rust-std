@@ -18,9 +18,7 @@
     ptr_cast_array,
     fmt_arguments_from_str
 )]
-#![cfg_attr(not(creusot),
-    feature(layout_for_ptr, new_range_api)
-)]
+#![cfg_attr(not(creusot), feature(layout_for_ptr, new_range_api))]
 pub mod intrinsics;
 pub mod ops;
 pub mod panic;

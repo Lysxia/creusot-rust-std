@@ -4,7 +4,7 @@ use core::mem::SizedTypeProperties as _;
 use core::{cmp, ptr};
 #[cfg(creusot)]
 use creusot_std::std::mem::size_of_logic;
-use creusot_std::{ghost::perm::Perm, prelude::*};
+use creusot_std::{ghost::perm::Perm, invariant::Guarded, prelude::*};
 
 type BufType = [usize; 32];
 
@@ -82,7 +82,7 @@ fn min_logic<T: OrdLogic>(x: T, y: T) -> T {
 #[requires(min_logic(left@, right@) <= size_of_logic::<BufType>() / size_of_logic::<T>())]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
-#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
+#[ensures((^perm).val_unsized()@ == (*perm).val_unsized()@[left@..].concat((*perm).val_unsized()@[..left@]))]
 unsafe fn ptr_rotate_memmove<T>(
     left: usize,
     mid: *mut T,
@@ -186,6 +186,7 @@ unsafe fn ptr_rotate_gcd<T>(
         Split::new(ghost! { *perm }, 0).into_inner()
     }
     .split();
+    ghost_let! { perm0 = &mut *perm0.into_inner().inner };
     let (mut tmp, perm0) = unsafe { read(x, perm0) };
     let mut i = right;
     // `gcd` can be found before hand by calculating `gcd(left + right, right)`,
@@ -219,7 +220,7 @@ unsafe fn ptr_rotate_gcd<T>(
         //
         // So `x+i` is valid for reading and writing if the caller respected the contract
         let perm1 = ghost! {
-            Split::index_mut(ghost! { &mut *perm1 }, i).into_inner()
+            &mut *Split::index_mut(ghost! { &mut *perm1 }, i).into_inner().inner
         };
         tmp = unsafe { replace(x.add_live_(i, live), tmp, perm1) };
         // instead of incrementing `i` and then checking if it is outside the bounds, we
@@ -254,6 +255,7 @@ unsafe fn ptr_rotate_gcd<T>(
             Split::new(ghost! { *perm }, start).into_inner()
         }
         .split();
+        ghost_let! { perm0_ = &mut *perm0_.into_inner().inner };
         proof_assert! { *perm0_.ward() == live.ward().offset_logic(start@) };
         // SAFETY: `gcd` is at most equal to `right` so all values in `1..gcd` are valid for
         // reading and writing as per the function's safety contract, see [long-safety-expl]
@@ -276,7 +278,7 @@ unsafe fn ptr_rotate_gcd<T>(
         loop {
             // SAFETY: see [long-safety-expl] and [safety-expl-addition]
             let perm1 = ghost! {
-                Split::index_mut(ghost! { &mut *perm1 }, i).into_inner()
+                &mut *Split::index_mut(ghost! { &mut *perm1 }, i).into_inner().inner
             };
             tmp = unsafe { replace(x.add_live(i, live), tmp, perm1) };
             if i >= left {
@@ -295,7 +297,7 @@ unsafe fn ptr_rotate_gcd<T>(
 }
 
 mod split {
-    use creusot_std::{ghost::perm::Perm, prelude::*};
+    use creusot_std::{ghost::perm::Perm, invariant::Guarded, prelude::*};
 
     pub struct Split<'a, T>(usize, &'a mut Perm<*const [T]>, &'a mut Perm<*const [T]>);
 
@@ -334,16 +336,18 @@ mod split {
         #[ensures((^perm).ward() == (*perm).ward())]
         #[ensures((*result).1.len() == perm.len())]
         #[ensures((*result).1.ix() == i)]
-        #[ensures(*(*result).0.ward() == (*perm).ward().thin().offset_logic(i@))]
+        #[ensures((*result).0.guard() == |p: &mut Perm<*const T>|
+            *p.ward() == (*perm).ward().thin().offset_logic(i@))]
         #[ensures((*result).1.base() == perm.ward().thin())]
         pub fn new(
             perm: Ghost<&'a mut Perm<*const [T]>>,
             i: usize,
-        ) -> Ghost<(&'a mut Perm<*const T>, Self)> {
+        ) -> Ghost<(Guarded<&'a mut Perm<*const T>>, Self)> {
             ghost! {
                 let (left, right) = perm.into_inner().split_at_mut(*Int::new(i as i128));
-                let (pi, right) = right.split_at_mut(1int);
-                (pi.index_mut(0int), Split(i, left, right))
+                let left = &mut *left.inner;
+                let (pi, right) = right.inner.split_at_mut(1int);
+                (pi.inner.index_mut(0int), Split(i, left, right.inner))
             }
         }
 
@@ -352,11 +356,12 @@ mod split {
         #[ensures((^self_).len() == (*self_).len())]
         #[ensures((^self_).base() == (*self_).base())]
         #[ensures((^self_).ix() == (*self_).ix())]
-        #[ensures(*result.ward() == self_.base().offset_logic(i@))]
+        #[ensures(result.guard() == |p: &mut Perm<*const T>|
+            *p.ward() == self_.base().offset_logic(i@))]
         pub fn index_mut<'b>(
             self_: Ghost<&'b mut Self>,
             i: usize,
-        ) -> Ghost<&'b mut Perm<*const T>> {
+        ) -> Ghost<Guarded<&'b mut Perm<*const T>>> {
             ghost! {
                 let j = self_.0;
                 if i < j {
@@ -372,8 +377,8 @@ mod split {
 #[trusted] // Axiomatization of std's replace
 #[erasure(<*mut T>::replace)]
 #[requires(src as *const T == *perm.ward())]
-#[ensures(dst == *(^perm).val())]
-#[ensures(result == *perm.val())]
+#[ensures(dst == (^perm).val())]
+#[ensures(result == perm.val())]
 unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T {
     let _ = perm;
     unsafe { src.replace(dst) }
@@ -399,7 +404,7 @@ unsafe fn replace<T>(src: *mut T, dst: T, perm: Ghost<&mut Perm<*const T>>) -> T
 #[erasure(private core::slice::rotate::ptr_rotate_swap)]
 #[requires(mid as *const T == perm.ward().thin().offset_logic(left@))]
 #[requires(left@ + right@ == perm.len())]
-#[ensures((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@]))]
+#[ensures((^perm).val_unsized()@ == (*perm).val_unsized()@[left@..].concat((*perm).val_unsized()@[..left@]))]
 #[inline]
 unsafe fn ptr_rotate_swap<T>(
     mut left: usize,
@@ -411,8 +416,8 @@ unsafe fn ptr_rotate_swap<T>(
     let _left0: Snapshot<Int> = snapshot! { left@ };
     #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
     #[invariant(left@ + right@ == perm.len())]
-    #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
-        ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
+    #[invariant((^perm).val_unsized()@ == (*perm).val_unsized()@[left@..].concat((*perm).val_unsized()@[..left@])
+        ==> (^_perm0).val_unsized()@ == (*_perm0).val_unsized()@[*_left0..].concat((*_perm0).val_unsized()@[..*_left0]))]
     loop {
         if left >= right {
             // Algorithm 3
@@ -422,17 +427,20 @@ unsafe fn ptr_rotate_swap<T>(
             #[invariant(left >= right)]
             #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
             #[invariant(left@ + right@ == perm.len())]
-            #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
-                ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
+            #[invariant((^perm).val_unsized()@ == (*perm).val_unsized()@[left@..].concat((*perm).val_unsized()@[..left@])
+                ==> (^_perm0).val_unsized()@ == (*_perm0).val_unsized()@[*_left0..].concat((*_perm0).val_unsized()@[..*_left0]))]
             loop {
                 let _perm: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
-                let (mut perm01, perm2) = ghost! {
+                let (perm01, perm2) = ghost! {
                     perm.into_inner().split_at_mut(*Int::new(left as i128))
                 }
                 .split();
-                let mut perm1 = ghost! {
+                ghost_let! { mut perm01 = &mut *perm01.into_inner().inner };
+                ghost_let! { perm2 = &mut *perm2.into_inner().inner };
+                ghost_let! { perm1 =
                     perm01.split_at_mut(*Int::new((left - right) as i128)).1
                 };
+                ghost_let! { perm1 = &mut *perm1.into_inner().inner };
                 let live = ghost! { perm1.live_mut() };
                 ghost! { ptr_rotate_swap_lemma_for_sub_live(mid, right, &live) };
                 // SAFETY:
@@ -444,7 +452,7 @@ unsafe fn ptr_rotate_swap<T>(
                         mid.sub_live(right, live),
                         mid,
                         right,
-                        ghost! { *perm1 },
+                        perm1,
                         perm2,
                     );
                     mid = mid.sub_live(right, live);
@@ -462,16 +470,18 @@ unsafe fn ptr_rotate_swap<T>(
             #[invariant(left <= right)]
             #[invariant(mid as *const T == perm.ward().thin().offset_logic(left@))]
             #[invariant(left@ + right@ == perm.len())]
-            #[invariant((^perm).val()@ == (*perm).val()@[left@..].concat((*perm).val()@[..left@])
-                ==> (^_perm0).val()@ == (*_perm0).val()@[*_left0..].concat((*_perm0).val()@[..*_left0]))]
+            #[invariant((^perm).val_unsized()@ == (*perm).val_unsized()@[left@..].concat((*perm).val_unsized()@[..left@])
+                ==> (^_perm0).val_unsized()@ == (*_perm0).val_unsized()@[*_left0..].concat((*_perm0).val_unsized()@[..*_left0]))]
             loop {
                 let _perm: Snapshot<&mut Perm<*const [T]>> = snapshot! { *perm };
-                let (perm0, mut perm12) = ghost! {
+                let (perm0, perm12) = ghost! {
                     perm.into_inner().split_at_mut(*Int::new(left as i128))
                 }
                 .split();
-                let mut perm1 = ghost! {
-                    perm12.split_at_mut(*Int::new(left as i128)).0
+                ghost_let! { perm0 = &mut *perm0.into_inner().inner };
+                ghost_let! { mut perm12 = &mut *perm12.into_inner().inner };
+                ghost_let! { mut perm1 =
+                    &mut *perm12.split_at_mut(*Int::new(left as i128)).0.inner
                 };
                 // SAFETY: `[mid-left, mid+left)` is valid for reading and writing because
                 // `left < right` so `mid+left < mid+right`.
@@ -520,12 +530,12 @@ fn ptr_rotate_swap_lemma_for_sub_live<T>(
 #[check(ghost)]
 #[requires(left <= len && len@ == perm.len() && prev.len() == perm.len() + len@ - left@)]
 #[requires((^prev).len() == prev.len())]
-#[requires(perm.val()@[..left@] == prev.val()@[..left@])]
-#[requires(perm.val()@[left@..] == prev.val()@[len@..])]
-#[requires((^prev).val()@[len@..] == prev.val()@[left@..len@])]
-#[requires((^prev).val()@[..len@] == (^perm).val()@)]
-#[ensures((^perm).val()@ == perm.val()@[left@..].concat(perm.val()@[..left@])
-    ==> (^prev).val()@ == (*prev).val()@[len@..].concat((*prev).val()@[..len@]))]
+#[requires(perm.val_unsized()@[..left@] == prev.val_unsized()@[..left@])]
+#[requires(perm.val_unsized()@[left@..] == prev.val_unsized()@[len@..])]
+#[requires((^prev).val_unsized()@[len@..] == prev.val_unsized()@[left@..len@])]
+#[requires((^prev).val_unsized()@[..len@] == (^perm).val_unsized()@)]
+#[ensures((^perm).val_unsized()@ == perm.val_unsized()@[left@..].concat(perm.val_unsized()@[..left@])
+    ==> (^prev).val_unsized()@ == (*prev).val_unsized()@[len@..].concat((*prev).val_unsized()@[..len@]))]
 fn ptr_rotate_swap_lemma<T>(
     left: usize,
     len: usize,
@@ -533,23 +543,23 @@ fn ptr_rotate_swap_lemma<T>(
     perm: Snapshot<&mut Perm<*const [T]>>,
 ) {
     let _ = (left, len, prev, perm);
-    proof_assert! { (^prev).val()@ == (^prev).val()@[..len@].concat((^prev).val()@[len@..]) }
+    proof_assert! { (^prev).val_unsized()@ == (^prev).val_unsized()@[..len@].concat((^prev).val_unsized()@[len@..]) }
 }
 
 #[check(ghost)]
 #[requires(left@ <= perm.len() && prev.len() == left@ + perm.len())]
 #[requires((^prev).len() == prev.len())]
-#[requires(perm.val()@[..left@] == prev.val()@[..left@])]
-#[requires(perm.val()@[left@..] == prev.val()@[left@ + left@..])]
-#[requires((^prev).val()@[..left@] == prev.val()@[left@..left@ + left@])]
-#[requires((^prev).val()@[left@..] == (^perm).val()@)]
-#[ensures((^perm).val()@ == perm.val()@[left@..].concat(perm.val()@[..left@])
-    ==> (^prev).val()@ == (*prev).val()@[left@..].concat((*prev).val()@[..left@]))]
+#[requires(perm.val_unsized()@[..left@] == prev.val_unsized()@[..left@])]
+#[requires(perm.val_unsized()@[left@..] == prev.val_unsized()@[left@ + left@..])]
+#[requires((^prev).val_unsized()@[..left@] == prev.val_unsized()@[left@..left@ + left@])]
+#[requires((^prev).val_unsized()@[left@..] == (^perm).val_unsized()@)]
+#[ensures((^perm).val_unsized()@ == perm.val_unsized()@[left@..].concat(perm.val_unsized()@[..left@])
+    ==> (^prev).val_unsized()@ == (*prev).val_unsized()@[left@..].concat((*prev).val_unsized()@[..left@]))]
 fn ptr_rotate_swap_lemma2<T>(
     left: usize,
     prev: Snapshot<&mut Perm<*const [T]>>,
     perm: Snapshot<&mut Perm<*const [T]>>,
 ) {
     let _ = (left, prev, perm);
-    proof_assert! { (^prev).val()@ == (^prev).val()@[..left@].concat((^prev).val()@[left@..]) }
+    proof_assert! { (^prev).val_unsized()@ == (^prev).val_unsized()@[..left@].concat((^prev).val_unsized()@[left@..]) }
 }

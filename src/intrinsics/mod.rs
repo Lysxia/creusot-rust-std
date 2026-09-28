@@ -173,7 +173,7 @@ pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
 #[erasure(core::intrinsics::copy_nonoverlapping::<T>)]
 #[requires(src_perm.ward().thin() == src && src_perm.len() == count@)]
 #[requires(dst_perm.ward().thin() == dst as *const T && dst_perm.len() == count@)]
-#[ensures((^dst_perm).val()@ == src_perm.val()@)]
+#[ensures((^dst_perm).val_unsized()@ == src_perm.val_unsized()@)]
 /* pub const */
 pub unsafe fn copy_nonoverlapping<T>(
     src: *const T,

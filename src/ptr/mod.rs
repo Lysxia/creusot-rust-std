@@ -4,7 +4,7 @@ use crate::{
 };
 use ::core::mem::SizedTypeProperties as _;
 use core::hint::assert_unchecked as assume;
-use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive, invariant::Guarded};
+use creusot_std::{ghost::perm::Perm, invariant::Guarded, prelude::*, std::ptr::PtrLive};
 use std::{
     mem::{self, MaybeUninit},
     num::NonZero,
@@ -422,7 +422,7 @@ pub const unsafe fn swap<T>(x: *mut T, y: *mut T) {
 #[erasure(core::ptr::swap_nonoverlapping)]
 #[requires(x as *const T == x_perm.ward().thin() && count@ == x_perm.len())]
 #[requires(y as *const T == y_perm.ward().thin() && count@ == y_perm.len())]
-#[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
+#[ensures((^x_perm).val_unsized()@ == y_perm.val_unsized()@ && (^y_perm).val_unsized()@ == x_perm.val_unsized()@)]
 #[ensures(x as *const T == (^x_perm).ward().thin())]
 #[ensures(y as *const T == (^y_perm).ward().thin())]
 pub const unsafe fn swap_nonoverlapping<T>(
@@ -481,7 +481,7 @@ pub const unsafe fn swap_nonoverlapping<T>(
 #[allow(unreachable_code, unused)]
 #[requires(x as *const T == x_perm.ward().thin() && count@ == x_perm.len())]
 #[requires(y as *const T == y_perm.ward().thin() && count@ == y_perm.len())]
-#[ensures((^x_perm).val()@ == y_perm.val()@ && (^y_perm).val()@ == x_perm.val()@)]
+#[ensures((^x_perm).val_unsized()@ == y_perm.val_unsized()@ && (^y_perm).val_unsized()@ == x_perm.val_unsized()@)]
 #[ensures(x as *const T == (^x_perm).ward().thin())]
 #[ensures(y as *const T == (^y_perm).ward().thin())]
 const unsafe fn swap_nonoverlapping_const<T>(
@@ -609,10 +609,10 @@ pub fn contains_range<T>(perm: Perm<*const [T]>, ptr: *const T, count: Int) -> b
     let dst_offset = (dst as *const T).sub_logic(perm.ward().thin());
     // Unchanged outside of `[dst..dst+count)`
     (forall<i: Int> 0 <= i && i < dst_offset || dst_offset + count@ <= i && i < perm.len()
-        ==> (^perm).val()@[i] == (*perm).val()@[i])
+        ==> (^perm).val_unsized()@[i] == (*perm).val_unsized()@[i])
     // The new value in the range `[dst..dst+count)` is `[src..src+count)`
     && (forall<i: Int> dst_offset <= i && i < dst_offset + count@
-        ==> (^perm).val()@[i] == (*perm).val()@[i + src_offset - dst_offset])
+        ==> (^perm).val_unsized()@[i] == (*perm).val_unsized()@[i + src_offset - dst_offset])
 })]
 pub unsafe fn copy_copy<T: Copy>(
     src: *const T,
@@ -710,7 +710,7 @@ impl<T> CopyPerm<'_, T> {
 #[erasure(core::ptr::copy_nonoverlapping::<T>)]
 #[requires(src_perm.ward().thin() == src && src_perm.len() == count@)]
 #[requires(dst_perm.ward().thin() == dst as *const T && dst_perm.len() == count@)]
-#[ensures((^dst_perm).val()@ == src_perm.val()@)]
+#[ensures((^dst_perm).val_unsized()@ == src_perm.val_unsized()@)]
 /* pub const */
 pub unsafe fn copy_nonoverlapping<T>(
     src: *const T,
@@ -753,7 +753,7 @@ pub unsafe fn copy_nonoverlapping<T>(
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
 #[ensures(result.len() == perm.len() / N@)]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
-    ==> result.val()@[i]@[j] == perm.val()@[i * N@ + j])]
+    ==> result.val_unsized()@[i]@[j] == perm.val_unsized()@[i * N@ + j])]
 pub fn cast_chunks_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [[T; N]]> {
     unreachable!("ghost code")
 }
@@ -766,10 +766,10 @@ pub fn cast_chunks_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*co
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
 #[ensures(result.len() == perm.len() / N@)]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
-    ==> result.val()@[i]@[j] == perm.val()@[i * N@ + j])]
+    ==> result.val_unsized()@[i]@[j] == perm.val_unsized()@[i * N@ + j])]
 #[ensures(perm.ward() == (^perm).ward())]
 #[ensures(forall<i, j> 0 <= i && i < perm.len() / N@ && 0 <= j && j < N@
-    ==> (^result).val()@[i]@[j] == (^perm).val()@[i * N@ + j])]
+    ==> (^result).val_unsized()@[i]@[j] == (^perm).val_unsized()@[i * N@ + j])]
 pub fn cast_chunks_perm_mut<const N: usize, T>(
     perm: &mut Perm<*const [T]>,
 ) -> &mut Perm<*const [[T; N]]> {
@@ -780,7 +780,7 @@ pub fn cast_chunks_perm_mut<const N: usize, T>(
 #[trusted]
 #[trusted(ghost)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
-#[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
+#[ensures(result.val_unsized()@ == perm.val_unsized()@.flat_map(|chunk: [T; N]| chunk@))]
 pub fn cast_from_chunks_perm<const N: usize, T>(perm: &Perm<*const [[T; N]]>) -> &Perm<*const [T]> {
     unreachable!("ghost code")
 }
@@ -789,9 +789,9 @@ pub fn cast_from_chunks_perm<const N: usize, T>(perm: &Perm<*const [[T; N]]>) ->
 #[trusted]
 #[trusted(ghost)]
 #[ensures(*result.ward() as *const T == *perm.ward() as *const T)]
-#[ensures(result.val()@ == perm.val()@.flat_map(|chunk: [T; N]| chunk@))]
+#[ensures(result.val_unsized()@ == perm.val_unsized()@.flat_map(|chunk: [T; N]| chunk@))]
 #[ensures(perm.ward() == (^perm).ward())]
-#[ensures(forall<i> 0 <= i && i < perm.len() ==> (^perm).val()@[i]@ == (^result).val()@[N@ * i .. N@ * i + N@])]
+#[ensures(forall<i> 0 <= i && i < perm.len() ==> (^perm).val_unsized()@[i]@ == (^result).val_unsized()@[N@ * i .. N@ * i + N@])]
 pub fn cast_from_chunks_perm_mut<const N: usize, T>(
     perm: &mut Perm<*const [[T; N]]>,
 ) -> &mut Perm<*const [T]> {
@@ -803,7 +803,7 @@ pub fn cast_from_chunks_perm_mut<const N: usize, T>(
 #[trusted(ghost)]
 #[requires(perm.len() == N@)]
 #[ensures(*result.ward() == *perm.ward() as *const [T; N])]
-#[ensures(result.val()@ == perm.val()@)]
+#[ensures(result.val_unsized()@ == perm.val_unsized()@)]
 pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*const [T; N]> {
     unreachable!("ghost code")
 }
@@ -813,9 +813,9 @@ pub fn cast_array_perm<const N: usize, T>(perm: &Perm<*const [T]>) -> &Perm<*con
 #[trusted(ghost)]
 #[requires(perm.len() == N@)]
 #[ensures(*result.ward() == *perm.ward() as *const [T; N])]
-#[ensures(result.val()@ == perm.val()@)]
+#[ensures(result.val_unsized()@ == perm.val_unsized()@)]
 #[ensures(perm.ward() == (^perm).ward())]
-#[ensures((^result).val()@ == (^perm).val()@)]
+#[ensures((^result).val_unsized()@ == (^perm).val_unsized()@)]
 pub fn cast_array_perm_mut<const N: usize, T>(
     perm: &mut Perm<*const [T]>,
 ) -> &mut Perm<*const [T; N]> {
@@ -828,7 +828,7 @@ pub fn cast_array_perm_mut<const N: usize, T>(
 #[open_inv_result]
 #[requires(inv(perm))]
 #[requires(src as *const T == *perm.ward())]
-#[ensures(result.0 == *perm.val())]
+#[ensures(result.0 == perm.val())]
 #[ensures((^perm).ward() == perm.ward() && result.1.ward() == perm.ward())]
 #[ensures((^perm).val() == (^result.1).val())]
 pub unsafe fn read<T>(
@@ -844,7 +844,7 @@ pub unsafe fn read<T>(
 #[erasure(<*mut T>::write)]
 #[requires(inv(src))]
 #[requires(dst as *const T == *perm.ward())]
-#[ensures(*(^perm).val() == src)]
+#[ensures((^perm).val() == src)]
 #[ensures(inv(^perm))]
 pub unsafe fn write<T>(
     dst: *mut T,
