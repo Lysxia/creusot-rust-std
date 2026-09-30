@@ -8,7 +8,7 @@ use creusot_std::{ghost::perm::Perm, prelude::*, std::ptr::PtrLive};
 // we can specify them.
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::exact_div)]
 #[requires(0 < y@ && x@ % y@ == 0)]
 #[ensures(result@ == x@ / y@)]
@@ -17,7 +17,7 @@ pub const unsafe fn exact_div(x: usize, y: usize) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::cttz_nonzero)]
 #[requires(x@ != 0)]
 pub const unsafe fn cttz_nonzero(x: usize) -> u32 {
@@ -25,7 +25,7 @@ pub const unsafe fn cttz_nonzero(x: usize) -> u32 {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::mul_with_overflow)]
 #[ensures(result.0@ == x@ * y@ % (usize::MAX@ + 1))]
 #[ensures(result.1 == (x@ * y@ <= usize::MAX@))]
@@ -34,7 +34,7 @@ pub const fn mul_with_overflow(x: usize, y: usize) -> (usize, bool) {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::unchecked_rem)]
 #[requires(y@ != 0)]
 #[ensures(result@ == x@ % y@)]
@@ -43,7 +43,7 @@ pub const unsafe fn unchecked_rem(x: usize, y: usize) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::unchecked_shl)]
 #[requires(y@ < usize::BITS@)]
 #[ensures(result == x << y)]
@@ -52,7 +52,7 @@ pub const unsafe fn unchecked_shl(x: usize, y: u32) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::unchecked_shr)]
 #[requires(y@ < usize::BITS@)]
 #[ensures(result == x >> y)]
@@ -61,7 +61,7 @@ pub const unsafe fn unchecked_shr(x: usize, y: u32) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::unchecked_sub)]
 #[requires(0 <= x@ - y@)]
 #[ensures(result@ == x@ - y@)]
@@ -70,7 +70,7 @@ pub const unsafe fn unchecked_sub(x: usize, y: usize) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::unchecked_sub)]
 #[requires(isize::MIN@ <= x@ - y@ && x@ - y@ <= isize::MAX@)]
 #[ensures(result@ == x@ - y@)]
@@ -79,7 +79,7 @@ pub const unsafe fn unchecked_sub_isize(x: isize, y: isize) -> isize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::wrapping_add)]
 #[ensures(result@ == a@ + b@ % (usize::MAX@ + 1))]
 pub const fn wrapping_add(a: usize, b: usize) -> usize {
@@ -87,7 +87,7 @@ pub const fn wrapping_add(a: usize, b: usize) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::wrapping_mul)]
 #[ensures(result@ == a@ * b@ % (usize::MAX@ + 1))]
 pub const fn wrapping_mul(a: usize, b: usize) -> usize {
@@ -95,7 +95,7 @@ pub const fn wrapping_mul(a: usize, b: usize) -> usize {
 }
 
 #[trusted]
-#[check(ghost_trusted)]
+#[trusted(ghost)]
 #[erasure(::core::intrinsics::wrapping_sub)]
 #[ensures(result@ == a@ - b@ % (usize::MAX@ + 1))]
 pub const fn wrapping_sub(a: usize, b: usize) -> usize {
@@ -173,7 +173,7 @@ pub unsafe fn copy<T>(src: *const T, dst: *mut T, count: usize) {
 #[erasure(core::intrinsics::copy_nonoverlapping::<T>)]
 #[requires(src_perm.ward().thin() == src && src_perm.len() == count@)]
 #[requires(dst_perm.ward().thin() == dst as *const T && dst_perm.len() == count@)]
-#[ensures((^dst_perm).val()@ == src_perm.val()@)]
+#[ensures((^dst_perm).val_unsized()@ == src_perm.val_unsized()@)]
 /* pub const */
 pub unsafe fn copy_nonoverlapping<T>(
     src: *const T,
@@ -225,9 +225,9 @@ pub unsafe fn offset_live_mut<T>(dst: *mut T, offset: isize, live: Ghost<PtrLive
 extern_spec! {
     mod core {
         mod intrinsics {
-            #[requires(|mode| _called_in_const.precondition(mode, _arg))]
-            #[requires(|mode| _called_at_rt.precondition(mode, _arg))]
-            #[ensures(|result, mode| _called_in_const.postcondition_once(mode, _arg, result) || _called_at_rt.postcondition_once(mode, _arg, result))]
+            #[requires(_called_in_const.precondition(_arg, mode!()))]
+            #[requires(_called_at_rt.precondition(_arg, mode!()))]
+            #[ensures(_called_in_const.postcondition_once(_arg, result, mode!()) || _called_at_rt.postcondition_once(_arg, result, mode!()))]
             fn const_eval_select<ARG, F, G, RET>(
                 _arg: ARG,
                 _called_in_const: F,

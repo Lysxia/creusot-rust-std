@@ -3,8 +3,8 @@ use creusot_std::prelude::*;
 pub macro const_panic {
     ($const_msg:literal, $runtime_msg:literal, $($arg:ident : $ty:ty = $val:expr),* $(,)?) => {{
         #[trusted] // TODO: strings
-        #[check(ghost_trusted)]
-        #[requires(|mode| !mode.nopanic())]
+        #[trusted(ghost)]
+        #[requires(!mode!().nopanic())]
         const fn do_panic($($arg: $ty),*) -> ! {
             $crate::intrinsics::const_eval_select!(
                 @capture { $($arg: $ty = $arg),* } -> !:

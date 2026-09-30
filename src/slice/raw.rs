@@ -4,7 +4,7 @@ use creusot_std::{ghost::perm::Perm, prelude::*};
 
 #[requires(perm.ward().thin() == data)]
 #[requires(len@ == perm.len())]
-#[ensures(result@ == perm.val()@)]
+#[ensures(result@ == perm.val_unsized()@)]
 #[erasure(::std::slice::from_raw_parts)]
 pub unsafe fn from_raw_parts_perm<'a, T>(
     data: *const T,
@@ -36,9 +36,9 @@ pub unsafe fn from_raw_parts_perm<'a, T>(
 
 #[requires(perm.ward().thin() == data as *const T)]
 #[requires(len@ == perm.len())]
-#[ensures(result@ == perm.val()@)]
+#[ensures(result@ == perm.val_unsized()@)]
 #[ensures((^*perm).ward() == perm.ward())]
-#[ensures((^result)@ == (^*perm).val()@)]
+#[ensures((^result)@ == (^*perm).val_unsized()@)]
 #[erasure(::std::slice::from_raw_parts_mut)]
 pub unsafe fn from_raw_parts_mut_perm<T>(
     data: *mut T,
